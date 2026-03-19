@@ -10,66 +10,69 @@ on:
       - master
 
 jobs:
-  coverage:
-    runs-on: ubuntu-latest
-    container: docker://jgeudens/qt-linux:6.8.3_build_1
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v6.0.0
+  # coverage:
+  #   runs-on: ubuntu-latest
+  #   container: docker://jgeudens/qt-linux:6.8.3_build_1
+  #   steps:
+  #   - name: Checkout
+  #     uses: actions/checkout@v6.0.0
 
-    - name: Start display server
-      run: bash /start.sh &
+  #   - name: Start display server
+  #     run: bash /start.sh &
 
-    - name: configure safe directory for git
-      run: git config --global --add safe.directory ${GITHUB_WORKSPACE}
+  #   - name: configure safe directory for git
+  #     run: git config --global --add safe.directory "${GITHUB_WORKSPACE}"
       
-    - name: Prepare environment for Ninja build with coverage
-      run: |
-        cmake . -GNinja -DUSE_GCOV=ON
-        ninja
+  #   - name: Prepare environment for Ninja build with coverage
+  #     run: |
+  #       cmake . -GNinja -DUSE_GCOV=ON
+  #       ninja
 
-    - name: Generate gcovr coverage report
-      run: |
-        ctest
-        gcovr --gcov-ignore-parse-errors --cobertura cobertura.xml
+  #   - name: Generate gcovr coverage report
+  #     run: |
+  #       ctest
+  #       gcovr --gcov-ignore-parse-errors --cobertura cobertura.xml
 
-    - name: Run codacy-coverage-reporter
-      uses: codacy/codacy-coverage-reporter-action@v1
-      with:
-        api-token: ${{ secrets.CODACY_PROJECT_TOKEN }}
-        language: 'CPP'
-        coverage-reports: cobertura.xml
-      env:
-        PROJECT_TOKEN: ${{ secrets.CODACY_PROJECT_TOKEN }}
-      if: ${{ !!env.PROJECT_TOKEN }}
+  #   - name: Run codacy-coverage-reporter
+  #     uses: codacy/codacy-coverage-reporter-action@v1
+  #     with:
+  #       api-token: ${{ secrets.CODACY_PROJECT_TOKEN }}
+  #       language: 'CPP'
+  #       coverage-reports: cobertura.xml
+  #     env:
+  #       PROJECT_TOKEN: ${{ secrets.CODACY_PROJECT_TOKEN }}
+  #     if: ${{ !!env.PROJECT_TOKEN }}
 
-  sonarqube:
+  clazy:
     runs-on: ubuntu-latest
     container: docker://jgeudens/qt-linux:6.8.3_build_1
-    env:
-      BUILD_WRAPPER_OUT_DIR: build_wrapper_output_directory # Directory where build-wrapper output will be placed
-      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
     - uses: actions/checkout@v6.0.0
-      with:
-        # Disabling shallow clone is recommended for improving relevancy of reporting
-        fetch-depth: 0
 
-    - name: Install Build Wrapper
-      uses: SonarSource/sonarqube-scan-action/install-build-wrapper@v7.0
-      
-    - name: Run build-wrapper
+    - name: Configure safe directory for git
+      run: git config --global --add safe.directory "${GITHUB_WORKSPACE}"
+
+    - name: Install clazy
       run: |
-        # here goes your compilation wrapped with build-wrapper; See https://docs.sonarcloud.io/advanced-setup/languages/c-c-objective-c/#analysis-steps-using-build-wrapper for more information
-        cmake . -GNinja
-        build-wrapper-linux-x86-64 --out-dir ${{ env.BUILD_WRAPPER_OUT_DIR }} ninja
-      if: ${{ !!env.SONAR_TOKEN && !!env.GITHUB_TOKEN }}
+        apt-get update
+        apt-get install -y clazy
 
-    - name: SonarQube Scan
-      uses: SonarSource/sonarqube-scan-action@v7.0
-      with:
-        # Consult https://docs.sonarsource.com/sonarqube-server/latest/analyzing-source-code/scanners/sonarscanner/ for more information and options
-        args: >
-          --define "sonar.cfamily.compile-commands=${{ env.BUILD_WRAPPER_OUT_DIR }}/compile_commands.json"
-      if: ${{ !!env.SONAR_TOKEN && !!env.GITHUB_TOKEN }}
+    - name: Run clazy
+      run: bash scripts/run_clazy.sh
+
+  clang-tidy:
+    runs-on: ubuntu-latest
+    container: docker://jgeudens/qt-linux:6.8.3_build_1
+    steps:
+    - uses: actions/checkout@v6.0.0
+
+    - name: Configure safe directory for git
+      run: git config --global --add safe.directory "${GITHUB_WORKSPACE}"
+
+    - name: Install clang-tidy
+      run: |
+        apt-get update
+        apt-get install -y clang-tidy
+
+    - name: Run clang-tidy
+      run: bash scripts/run_clang_tidy.sh

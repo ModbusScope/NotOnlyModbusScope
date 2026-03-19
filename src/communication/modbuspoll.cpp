@@ -11,8 +11,7 @@
 
 using connectionId_t = ConnectionTypes::connectionId_t;
 
-ModbusPoll::ModbusPoll(SettingsModel * pSettingsModel, QObject *parent) :
-    QObject(parent), _bPollActive(false)
+ModbusPoll::ModbusPoll(SettingsModel* pSettingsModel, QObject* parent) : QObject(parent), _bPollActive(false)
 {
 
     _pPollTimer = new QTimer();
@@ -38,7 +37,7 @@ ModbusPoll::ModbusPoll(SettingsModel * pSettingsModel, QObject *parent) :
 
 ModbusPoll::~ModbusPoll()
 {
-    for (quint8 i = 0u; i < _modbusMasters.size(); i++)
+    for (qsizetype i = 0; i < _modbusMasters.size(); i++)
     {
         _modbusMasters[i]->pModbusMaster->disconnect();
 
@@ -88,7 +87,8 @@ void ModbusPoll::startCommunication(QList<ModbusRegister>& registerList)
             }
             qCInfo(scopeCommConnection) << qPrintable(str);
 
-            for (deviceId_t devId : _pSettingsModel->deviceListForConnection(i))
+            const auto devicesForConn = _pSettingsModel->deviceListForConnection(i);
+            for (deviceId_t devId : devicesForConn)
             {
                 Device* dev = _pSettingsModel->deviceSettings(devId);
                 QString devStr = QString("[Device] %1: slave ID %2, max consecutive %3, 32-bit little endian %4")
@@ -181,7 +181,7 @@ bool ModbusPoll::isActive()
 
 void ModbusPoll::triggerRegisterRead()
 {
-    if(_bPollActive)
+    if (_bPollActive)
     {
         _lastPollStart = QDateTime::currentMSecsSinceEpoch();
 
