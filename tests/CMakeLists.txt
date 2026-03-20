@@ -54,6 +54,7 @@ add_subdirectory(datahandling)
 add_subdirectory(dialogs)
 add_subdirectory(importexport)
 add_subdirectory(models)
+add_subdirectory(ProtocolAdapter)
 add_subdirectory(util)
 
 
