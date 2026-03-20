@@ -103,7 +103,13 @@ int AdapterClient::sendRequest(const QString& method, const QJsonObject& params)
 void AdapterClient::writeFramed(const QByteArray& json)
 {
     QByteArray frame = "Content-Length: " + QByteArray::number(json.size()) + "\r\n\r\n" + json;
-    _pProcess->write(frame);
+    qint64 written = _pProcess->write(frame);
+    if (written == -1)
+    {
+        _state = State::IDLE;
+        emit sessionError(QString("Failed to write to adapter process: %1 (error: %2)")
+                            .arg(_pProcess->errorString(), static_cast<int>(_pProcess->error())));
+    }
 }
 
 void AdapterClient::onReadyReadStdout()

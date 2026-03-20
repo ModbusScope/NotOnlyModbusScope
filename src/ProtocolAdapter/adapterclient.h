@@ -18,7 +18,7 @@
  *   requestReadData() → readData → readDataResult()
  *   stopSession() → shutdown → process exit
  *
- * All messages use Content-Length framing as defined in the JSON-RPC spec.
+ * All messages use Content-Length framing (as used in the Language Server Protocol).
  */
 class AdapterClient : public QObject
 {
@@ -69,14 +69,10 @@ signals:
      */
     void sessionError(QString message);
 
-private slots:
-    void onReadyReadStdout();
-    void onReadyReadStderr();
+protected slots:
     void onMessageReceived(QByteArray body);
-    void onProcessError(QProcess::ProcessError error);
-    void onProcessFinished(int exitCode, QProcess::ExitStatus exitStatus);
 
-private:
+protected:
     enum class State
     {
         IDLE,
@@ -87,6 +83,17 @@ private:
         STOPPING
     };
 
+    QMap<int, QString> _pendingMethods;
+    State _state{ State::IDLE };
+    int _nextRequestId{ 1 };
+
+private slots:
+    void onReadyReadStdout();
+    void onReadyReadStderr();
+    void onProcessError(QProcess::ProcessError error);
+    void onProcessFinished(int exitCode, QProcess::ExitStatus exitStatus);
+
+private:
     int sendRequest(const QString& method, const QJsonObject& params);
     void writeFramed(const QByteArray& json);
     void handleResponse(const QJsonObject& msg);
@@ -94,11 +101,8 @@ private:
 
     QProcess* _pProcess;
     FramingReader* _pFramingReader;
-    int _nextRequestId{ 1 };
-    QMap<int, QString> _pendingMethods;
     QJsonObject _pendingConfig;
     QStringList _pendingExpressions;
-    State _state{ State::IDLE };
 };
 
 #endif // ADAPTERCLIENT_H
