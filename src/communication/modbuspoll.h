@@ -2,6 +2,7 @@
 #define COMMUNICATION_MANAGER_H
 
 #include "ProtocolAdapter/adapterclient.h"
+#include "ProtocolAdapter/adapterprocess.h"
 #include "communication/modbusregister.h"
 #include "util/result.h"
 
@@ -43,6 +44,7 @@ private:
     qint64 _lastPollStart;
 
     SettingsModel* _pSettingsModel;
+    AdapterProcess* _pAdapterProcess;
     AdapterClient* _pAdapterClient;
 };
 

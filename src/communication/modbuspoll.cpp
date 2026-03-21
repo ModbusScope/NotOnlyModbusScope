@@ -19,7 +19,8 @@ ModbusPoll::ModbusPoll(SettingsModel* pSettingsModel, QObject* parent) : QObject
     _pSettingsModel = pSettingsModel;
     _lastPollStart = QDateTime::currentMSecsSinceEpoch();
 
-    _pAdapterClient = new AdapterClient(this);
+    _pAdapterProcess = new AdapterProcess(this);
+    _pAdapterClient = new AdapterClient(_pAdapterProcess, this);
 
     connect(_pAdapterClient, &AdapterClient::sessionStarted, this, &ModbusPoll::triggerRegisterRead);
     connect(_pAdapterClient, &AdapterClient::readDataResult, this, &ModbusPoll::onReadDataResult);
@@ -43,9 +44,10 @@ void ModbusPoll::startCommunication(QList<ModbusRegister>& registerList)
 
     resetCommunicationStats();
 
+    static constexpr QLatin1StringView cAdapterPath{ "./modbusadapter" };
     QJsonObject config = buildAdapterConfig();
     QStringList expressions = buildRegisterExpressions(_registerList);
-    _pAdapterClient->startSession(config, expressions);
+    _pAdapterClient->startSession(cAdapterPath, config, expressions);
 }
 
 void ModbusPoll::resetCommunicationStats()

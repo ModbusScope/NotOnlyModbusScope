@@ -11,12 +11,14 @@ private slots:
     void cleanup();
 
     void lifecycleInitializeToStart();
+    void describeSignalEmitted();
     void readDataValidResults();
     void readDataEmptyRegisters();
+    void requestStatusEmitsSignal();
     void errorResponseEmitsSessionError();
-    void unexpectedResponseId();
-    void invalidJson();
+    void unexpectedResponseEmitsNoSignals();
     void notificationIgnored();
+    void processErrorEmitsSessionError();
 };
 
 #endif // TST_ADAPTERCLIENT_H

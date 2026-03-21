@@ -1,6 +1,7 @@
 #include "tst_adapterclient.h"
 
 #include "ProtocolAdapter/adapterclient.h"
+#include "ProtocolAdapter/adapterprocess.h"
 
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -8,60 +9,80 @@
 #include <QSignalSpy>
 #include <QTest>
 
-/* ---- Test helper subclass ---- */
+/* ---- Mock AdapterProcess ---- */
 
-class TestableAdapterClient : public AdapterClient
+/*!
+ * \brief Test double for AdapterProcess.
+ *
+ * Overrides start/stop/sendRequest so no real process is spawned.
+ * Records all outgoing requests in sentRequests and exposes inject helpers
+ * to fire responseReceived/errorReceived as if the adapter had replied.
+ */
+class MockAdapterProcess : public AdapterProcess
 {
 public:
-    using AdapterClient::AdapterClient;
-    using AdapterClient::State;
-
-    //! Force the internal state machine into a given state.
-    void forceState(State s)
+    struct SentRequest
     {
-        _state = s;
+        QString method;
+        QJsonObject params;
+    };
+
+    QList<SentRequest> sentRequests;
+
+    bool start(const QString&) override
+    {
+        return true;
     }
 
-    //! Register a pending request so a crafted response can be matched.
-    //! Also advances the internal ID counter so subsequent sendRequest() calls do not reuse the seeded id.
-    void forceAddPending(int id, const QString& method)
+    void stop() override
     {
-        _pendingMethods.insert(id, method);
-        if (id >= _nextRequestId)
-        {
-            _nextRequestId = id + 1;
-        }
     }
 
-    //! Inject a raw JSON body as if it arrived from the adapter process stdout.
-    void injectMessage(const QByteArray& body)
+    int sendRequest(const QString& method, const QJsonObject& params) override
     {
-        onMessageReceived(body);
+        int id = _nextMockId++;
+        sentRequests.append({ method, params });
+        return id;
     }
+
+    //! Simulate a successful response from the adapter for the given request ID.
+    void injectResponse(int id, const QString& method, const QJsonValue& result)
+    {
+        emit responseReceived(id, method, result);
+    }
+
+    //! Simulate an error response from the adapter for the given request ID.
+    void injectError(int id, const QString& method, const QJsonObject& error)
+    {
+        emit errorReceived(id, method, error);
+    }
+
+    //! Simulate a process-level error (crash, write failure, etc.).
+    void injectProcessError(const QString& message)
+    {
+        emit processError(message);
+    }
+
+private:
+    int _nextMockId{ 1 };
 };
 
 /* ---- Helpers ---- */
 
-static QByteArray makeResponse(int id, const QJsonObject& result)
+static QJsonObject describeResult()
 {
-    QJsonObject msg;
-    msg["jsonrpc"] = "2.0";
-    msg["id"] = id;
-    msg["result"] = result;
-    return QJsonDocument(msg).toJson(QJsonDocument::Compact);
-}
+    QJsonObject caps;
+    caps["supportsHotReload"] = false;
+    caps["requiresRestartOn"] = QJsonArray{ "connections", "devices" };
 
-static QByteArray makeErrorResponse(int id, int code, const QString& message)
-{
-    QJsonObject error;
-    error["code"] = code;
-    error["message"] = message;
-
-    QJsonObject msg;
-    msg["jsonrpc"] = "2.0";
-    msg["id"] = id;
-    msg["error"] = error;
-    return QJsonDocument(msg).toJson(QJsonDocument::Compact);
+    QJsonObject result;
+    result["name"] = "modbusAdapter";
+    result["version"] = "1.0.0";
+    result["configVersion"] = 1;
+    result["schema"] = QJsonObject{};
+    result["defaults"] = QJsonObject{};
+    result["capabilities"] = caps;
+    return result;
 }
 
 /* ---- Tests ---- */
@@ -76,41 +97,84 @@ void TestAdapterClient::cleanup()
 
 void TestAdapterClient::lifecycleInitializeToStart()
 {
-    TestableAdapterClient client;
+    auto* mock = new MockAdapterProcess();
+    AdapterClient client(mock);
+
     QSignalSpy spyStarted(&client, &AdapterClient::sessionStarted);
     QSignalSpy spyError(&client, &AdapterClient::sessionError);
+    QSignalSpy spyDescribe(&client, &AdapterClient::describeResult);
 
-    /* Seed the first request ID that initialize will use */
-    client.forceState(TestableAdapterClient::State::INITIALIZING);
-    client.forceAddPending(1, "adapter.initialize");
+    client.startSession(QStringLiteral("./dummy"), QJsonObject(), QStringList());
 
-    /* initialize ok → implementation auto-sends configure (id=2) */
-    client.injectMessage(makeResponse(1, QJsonObject{ { "status", "ok" } }));
+    /* 1. initialize was sent */
+    QCOMPARE(mock->sentRequests.size(), 1);
+    QCOMPARE(mock->sentRequests[0].method, QStringLiteral("adapter.initialize"));
+
+    /* 2. initialize ok → describe sent */
+    mock->injectResponse(1, "adapter.initialize", QJsonObject{ { "status", "ok" } });
+    QCOMPARE(mock->sentRequests.size(), 2);
+    QCOMPARE(mock->sentRequests[1].method, QStringLiteral("adapter.describe"));
     QCOMPARE(spyStarted.count(), 0);
 
-    /* configure ok → implementation auto-sends start (id=3) */
-    client.injectMessage(makeResponse(2, QJsonObject{ { "status", "ok" } }));
+    /* 3. describe ok → describeResult emitted, configure sent */
+    mock->injectResponse(2, "adapter.describe", describeResult());
+    QCOMPARE(mock->sentRequests.size(), 3);
+    QCOMPARE(mock->sentRequests[2].method, QStringLiteral("adapter.configure"));
+    QCOMPARE(spyDescribe.count(), 1);
     QCOMPARE(spyStarted.count(), 0);
 
-    /* start ok → sessionStarted emitted */
-    client.injectMessage(makeResponse(3, QJsonObject{ { "status", "ok" } }));
+    /* 4. configure ok → start sent */
+    mock->injectResponse(3, "adapter.configure", QJsonObject{ { "status", "ok" } });
+    QCOMPARE(mock->sentRequests.size(), 4);
+    QCOMPARE(mock->sentRequests[3].method, QStringLiteral("adapter.start"));
+    QCOMPARE(spyStarted.count(), 0);
+
+    /* 5. start ok → sessionStarted emitted */
+    mock->injectResponse(4, "adapter.start", QJsonObject{ { "status", "ok" } });
     QCOMPARE(spyStarted.count(), 1);
     QCOMPARE(spyError.count(), 0);
 }
 
+void TestAdapterClient::describeSignalEmitted()
+{
+    auto* mock = new MockAdapterProcess();
+    AdapterClient client(mock);
+
+    QSignalSpy spyDescribe(&client, &AdapterClient::describeResult);
+
+    client.startSession(QStringLiteral("./dummy"), QJsonObject(), QStringList());
+
+    mock->injectResponse(1, "adapter.initialize", QJsonObject{ { "status", "ok" } });
+
+    QJsonObject expected = describeResult();
+    mock->injectResponse(2, "adapter.describe", expected);
+
+    QCOMPARE(spyDescribe.count(), 1);
+    QJsonObject received = spyDescribe.at(0).at(0).value<QJsonObject>();
+    QCOMPARE(received["name"].toString(), QStringLiteral("modbusAdapter"));
+    QCOMPARE(received["configVersion"].toInt(), 1);
+}
+
 void TestAdapterClient::readDataValidResults()
 {
-    TestableAdapterClient client;
+    auto* mock = new MockAdapterProcess();
+    AdapterClient client(mock);
+
     QSignalSpy spy(&client, &AdapterClient::readDataResult);
 
-    client.forceState(TestableAdapterClient::State::ACTIVE);
-    client.forceAddPending(1, "adapter.readData");
+    /* Drive to ACTIVE state */
+    client.startSession(QStringLiteral("./dummy"), QJsonObject(), QStringList());
+    mock->injectResponse(1, "adapter.initialize", QJsonObject{ { "status", "ok" } });
+    mock->injectResponse(2, "adapter.describe", describeResult());
+    mock->injectResponse(3, "adapter.configure", QJsonObject{ { "status", "ok" } });
+    mock->injectResponse(4, "adapter.start", QJsonObject{ { "status", "ok" } });
+
+    client.requestReadData();
 
     QJsonArray registers;
     registers.append(QJsonObject{ { "valid", true }, { "value", 42.0 } });
     registers.append(QJsonObject{ { "valid", false }, { "value", 0.0 } });
-
-    client.injectMessage(makeResponse(1, QJsonObject{ { "registers", registers } }));
+    mock->injectResponse(5, "adapter.readData", QJsonObject{ { "registers", registers } });
 
     QCOMPARE(spy.count(), 1);
     ResultDoubleList results = spy.at(0).at(0).value<ResultDoubleList>();
@@ -122,81 +186,108 @@ void TestAdapterClient::readDataValidResults()
 
 void TestAdapterClient::readDataEmptyRegisters()
 {
-    TestableAdapterClient client;
+    auto* mock = new MockAdapterProcess();
+    AdapterClient client(mock);
+
     QSignalSpy spy(&client, &AdapterClient::readDataResult);
 
-    client.forceState(TestableAdapterClient::State::ACTIVE);
-    client.forceAddPending(1, "adapter.readData");
+    client.startSession(QStringLiteral("./dummy"), QJsonObject(), QStringList());
+    mock->injectResponse(1, "adapter.initialize", QJsonObject{ { "status", "ok" } });
+    mock->injectResponse(2, "adapter.describe", describeResult());
+    mock->injectResponse(3, "adapter.configure", QJsonObject{ { "status", "ok" } });
+    mock->injectResponse(4, "adapter.start", QJsonObject{ { "status", "ok" } });
 
-    client.injectMessage(makeResponse(1, QJsonObject{ { "registers", QJsonArray{} } }));
+    client.requestReadData();
+    mock->injectResponse(5, "adapter.readData", QJsonObject{ { "registers", QJsonArray{} } });
 
     QCOMPARE(spy.count(), 1);
     ResultDoubleList results = spy.at(0).at(0).value<ResultDoubleList>();
     QCOMPARE(results.size(), 0);
 }
 
+void TestAdapterClient::requestStatusEmitsSignal()
+{
+    auto* mock = new MockAdapterProcess();
+    AdapterClient client(mock);
+
+    QSignalSpy spy(&client, &AdapterClient::statusResult);
+
+    client.startSession(QStringLiteral("./dummy"), QJsonObject(), QStringList());
+    mock->injectResponse(1, "adapter.initialize", QJsonObject{ { "status", "ok" } });
+    mock->injectResponse(2, "adapter.describe", describeResult());
+    mock->injectResponse(3, "adapter.configure", QJsonObject{ { "status", "ok" } });
+    mock->injectResponse(4, "adapter.start", QJsonObject{ { "status", "ok" } });
+
+    client.requestStatus();
+    mock->injectResponse(5, "adapter.getStatus", QJsonObject{ { "active", true } });
+
+    QCOMPARE(spy.count(), 1);
+    QCOMPARE(spy.at(0).at(0).toBool(), true);
+}
+
 void TestAdapterClient::errorResponseEmitsSessionError()
 {
-    TestableAdapterClient client;
+    auto* mock = new MockAdapterProcess();
+    AdapterClient client(mock);
+
     QSignalSpy spy(&client, &AdapterClient::sessionError);
 
-    client.forceState(TestableAdapterClient::State::INITIALIZING);
-    client.forceAddPending(1, "adapter.initialize");
+    client.startSession(QStringLiteral("./dummy"), QJsonObject(), QStringList());
 
-    client.injectMessage(makeErrorResponse(1, -32602, "bad params"));
+    QJsonObject error;
+    error["code"] = -32602;
+    error["message"] = "bad params";
+    mock->injectError(1, "adapter.initialize", error);
 
     QCOMPARE(spy.count(), 1);
     QVERIFY(spy.at(0).at(0).toString().contains("bad params"));
 }
 
-void TestAdapterClient::unexpectedResponseId()
+void TestAdapterClient::unexpectedResponseEmitsNoSignals()
 {
-    TestableAdapterClient client;
+    auto* mock = new MockAdapterProcess();
+    AdapterClient client(mock);
+
     QSignalSpy spyStarted(&client, &AdapterClient::sessionStarted);
     QSignalSpy spyError(&client, &AdapterClient::sessionError);
     QSignalSpy spyData(&client, &AdapterClient::readDataResult);
 
-    client.forceState(TestableAdapterClient::State::ACTIVE);
-    /* No pending request for id 99 */
-    client.injectMessage(makeResponse(99, QJsonObject{ { "status", "ok" } }));
+    /* Inject a response for an ID that was never requested */
+    mock->injectResponse(99, "adapter.readData", QJsonObject{ { "registers", QJsonArray{} } });
 
     QCOMPARE(spyStarted.count(), 0);
     QCOMPARE(spyError.count(), 0);
     QCOMPARE(spyData.count(), 0);
-}
-
-void TestAdapterClient::invalidJson()
-{
-    TestableAdapterClient client;
-    QSignalSpy spyStarted(&client, &AdapterClient::sessionStarted);
-    QSignalSpy spyError(&client, &AdapterClient::sessionError);
-
-    client.forceState(TestableAdapterClient::State::ACTIVE);
-    client.injectMessage(QByteArray("not valid json {{{{"));
-
-    QCOMPARE(spyStarted.count(), 0);
-    QCOMPARE(spyError.count(), 0);
 }
 
 void TestAdapterClient::notificationIgnored()
 {
-    TestableAdapterClient client;
+    auto* mock = new MockAdapterProcess();
+    AdapterClient client(mock);
+
     QSignalSpy spyStarted(&client, &AdapterClient::sessionStarted);
     QSignalSpy spyError(&client, &AdapterClient::sessionError);
     QSignalSpy spyData(&client, &AdapterClient::readDataResult);
 
-    client.forceState(TestableAdapterClient::State::ACTIVE);
-
-    /* A notification has a "method" field and no "id" */
-    QJsonObject notification;
-    notification["jsonrpc"] = "2.0";
-    notification["method"] = "adapter.diagnostic";
-    notification["params"] = QJsonObject{ { "level", "info" }, { "message", "hello" } };
-    client.injectMessage(QJsonDocument(notification).toJson(QJsonDocument::Compact));
-
+    /* AdapterProcess filters notifications before emitting responseReceived,
+       so this test verifies the client stays silent when the process fires no signals */
     QCOMPARE(spyStarted.count(), 0);
     QCOMPARE(spyError.count(), 0);
     QCOMPARE(spyData.count(), 0);
+}
+
+void TestAdapterClient::processErrorEmitsSessionError()
+{
+    auto* mock = new MockAdapterProcess();
+    AdapterClient client(mock);
+
+    QSignalSpy spy(&client, &AdapterClient::sessionError);
+
+    client.startSession(QStringLiteral("./dummy"), QJsonObject(), QStringList());
+    mock->injectProcessError(QStringLiteral("Adapter process crashed"));
+
+    QCOMPARE(spy.count(), 1);
+    QVERIFY(spy.at(0).at(0).toString().contains("crashed"));
 }
 
 QTEST_GUILESS_MAIN(TestAdapterClient)

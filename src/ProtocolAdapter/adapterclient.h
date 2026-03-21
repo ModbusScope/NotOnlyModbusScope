@@ -1,42 +1,44 @@
 #ifndef ADAPTERCLIENT_H
 #define ADAPTERCLIENT_H
 
-#include "ProtocolAdapter/framingreader.h"
+#include "ProtocolAdapter/adapterprocess.h"
 #include "util/result.h"
 
 #include <QJsonObject>
-#include <QMap>
 #include <QObject>
-#include <QProcess>
 #include <QStringList>
 
 /*!
- * \brief Client for an external adapter process communicating via JSON-RPC 2.0 over stdio.
+ * \brief Lifecycle manager for an external adapter process communicating via JSON-RPC 2.0.
  *
- * Manages the adapter process lifecycle:
- *   startSession() → initialize → configure → start → sessionStarted()
+ * Drives the full adapter session sequence using an AdapterProcess for transport:
+ *   startSession() → initialize → describe → configure → start → sessionStarted()
  *   requestReadData() → readData → readDataResult()
+ *   requestStatus() → getStatus → statusResult()
  *   stopSession() → shutdown → process exit
  *
- * All messages use Content-Length framing (as used in the Language Server Protocol).
+ * Takes ownership of the AdapterProcess passed to the constructor.
  */
 class AdapterClient : public QObject
 {
     Q_OBJECT
 
 public:
-    explicit AdapterClient(QObject* parent = nullptr);
+    explicit AdapterClient(AdapterProcess* pProcess, QObject* parent = nullptr);
     ~AdapterClient();
 
     /*!
-     * \brief Launch the adapter process and run the initialization lifecycle.
+     * \brief Launch the adapter and run the full initialization lifecycle.
      *
-     * Starts the adapter executable, then sequentially sends adapter.initialize,
-     * adapter.configure, and adapter.start. Emits sessionStarted() on success.
-     * \param config       JSON object passed as the \c config param to adapter.configure.
+     * Starts the adapter at \a adapterPath, then sequentially sends
+     * adapter.initialize, adapter.describe, adapter.configure, and adapter.start.
+     * Emits sessionStarted() on success. Emits describeResult() during the describe step.
+     *
+     * \param adapterPath Path to the adapter executable.
+     * \param config JSON object passed as the \c config param to adapter.configure.
      * \param registerExpressions Register expression strings passed to adapter.start.
      */
-    void startSession(QJsonObject config, QStringList registerExpressions);
+    void startSession(const QString& adapterPath, QJsonObject config, QStringList registerExpressions);
 
     /*!
      * \brief Send an adapter.readData request to the active adapter.
@@ -47,13 +49,21 @@ public:
     void requestReadData();
 
     /*!
+     * \brief Send an adapter.getStatus request to the active adapter.
+     *
+     * Must only be called after sessionStarted() has been emitted.
+     * Emits statusResult() when the adapter responds.
+     */
+    void requestStatus();
+
+    /*!
      * \brief Send adapter.shutdown and terminate the adapter process.
      */
     void stopSession();
 
 signals:
     /*!
-     * \brief Emitted when the adapter has been initialized, configured, and started.
+     * \brief Emitted when the adapter has been initialized, described, configured, and started.
      */
     void sessionStarted();
 
@@ -69,38 +79,43 @@ signals:
      */
     void sessionError(QString message);
 
-protected slots:
-    void onMessageReceived(QByteArray body);
+    /*!
+     * \brief Emitted during startSession() when the adapter.describe response is received.
+     * \param description The full describe result object (name, version, configVersion, schema, defaults,
+     * capabilities).
+     */
+    void describeResult(QJsonObject description);
+
+    /*!
+     * \brief Emitted when an adapter.getStatus response has been received.
+     * \param active true if the adapter is actively polling.
+     */
+    void statusResult(bool active);
 
 protected:
     enum class State
     {
         IDLE,
         INITIALIZING,
+        DESCRIBING,
         CONFIGURING,
         STARTING,
         ACTIVE,
         STOPPING
     };
 
-    QMap<int, QString> _pendingMethods;
     State _state{ State::IDLE };
-    int _nextRequestId{ 1 };
 
 private slots:
-    void onReadyReadStdout();
-    void onReadyReadStderr();
-    void onProcessError(QProcess::ProcessError error);
-    void onProcessFinished(int exitCode, QProcess::ExitStatus exitStatus);
+    void onResponseReceived(int id, const QString& method, const QJsonValue& result);
+    void onErrorReceived(int id, const QString& method, const QJsonObject& error);
+    void onProcessError(const QString& message);
+    void onProcessFinished();
 
 private:
-    int sendRequest(const QString& method, const QJsonObject& params);
-    void writeFramed(const QByteArray& json);
-    void handleResponse(const QJsonObject& msg);
     void handleLifecycleResponse(const QString& method, const QJsonObject& result);
 
-    QProcess* _pProcess;
-    FramingReader* _pFramingReader;
+    AdapterProcess* _pProcess;
     QJsonObject _pendingConfig;
     QStringList _pendingExpressions;
 };
