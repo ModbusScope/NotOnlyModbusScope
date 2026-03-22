@@ -19,6 +19,12 @@ AdapterProcess::AdapterProcess(QObject* parent) : QObject(parent)
 
 bool AdapterProcess::start(const QString& path)
 {
+    if (_pProcess->state() != QProcess::NotRunning)
+    {
+        qCWarning(scopeComm) << "AdapterProcess: process already running";
+        return true;
+    }
+
     _pendingMethods.clear();
     _nextRequestId = 1;
 
