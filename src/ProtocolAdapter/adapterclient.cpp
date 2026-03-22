@@ -93,6 +93,8 @@ void AdapterClient::onErrorReceived(int id, const QString& method, const QJsonOb
     Q_UNUSED(id)
     QString errorMsg = error.value("message").toString();
     qCWarning(scopeComm) << "AdapterClient: error for" << method << ":" << errorMsg;
+    _state = State::IDLE;
+    _pProcess->stop();
     emit sessionError(QString("Adapter error on %1: %2").arg(method, errorMsg));
 }
 
