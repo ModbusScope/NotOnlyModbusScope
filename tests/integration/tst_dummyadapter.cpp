@@ -19,6 +19,7 @@ QJsonObject minimalConfig()
 {
     QJsonObject config;
     config["version"] = 1;
+    config["general"] = QJsonObject();
     config["connections"] = QJsonArray();
     config["devices"] = QJsonArray();
     return config;
@@ -32,12 +33,14 @@ void TestDummyAdapter::describeReturnsRequiredFields()
     AdapterClient client(process);
 
     QSignalSpy spyDescribe(&client, &AdapterClient::describeResult);
+    QSignalSpy spyStarted(&client, &AdapterClient::sessionStarted);
     QSignalSpy spyError(&client, &AdapterClient::sessionError);
 
-    client.startSession(QString::fromUtf8(DUMMY_ADAPTER_PATH), minimalConfig(), QStringList());
+    client.prepareAdapter(QString::fromUtf8(DUMMY_ADAPTER_PATH));
 
     QVERIFY2(spyDescribe.wait(cSessionTimeoutMs), "No describeResult signal received");
     QCOMPARE(spyError.count(), 0);
+    QCOMPARE(spyStarted.count(), 0);
 
     QJsonObject result = spyDescribe.at(0).at(0).value<QJsonObject>();
 
@@ -57,10 +60,12 @@ void TestDummyAdapter::describeNameIsModbusAdapter()
     AdapterClient client(process);
 
     QSignalSpy spyDescribe(&client, &AdapterClient::describeResult);
+    QSignalSpy spyStarted(&client, &AdapterClient::sessionStarted);
 
-    client.startSession(QString::fromUtf8(DUMMY_ADAPTER_PATH), minimalConfig(), QStringList());
+    client.prepareAdapter(QString::fromUtf8(DUMMY_ADAPTER_PATH));
 
     QVERIFY(spyDescribe.wait(cSessionTimeoutMs));
+    QCOMPARE(spyStarted.count(), 0);
 
     QJsonObject result = spyDescribe.at(0).at(0).value<QJsonObject>();
     QCOMPARE(result["name"].toString(), QStringLiteral("modbusAdapter"));
@@ -73,10 +78,14 @@ void TestDummyAdapter::fullLifecycleSessionStarts()
     auto* process = new AdapterProcess();
     AdapterClient client(process);
 
+    /* Provide config when describe result arrives so the lifecycle can continue */
+    connect(&client, &AdapterClient::describeResult, &client,
+            [&client]() { client.provideConfig(minimalConfig(), QStringList()); });
+
     QSignalSpy spyStarted(&client, &AdapterClient::sessionStarted);
     QSignalSpy spyError(&client, &AdapterClient::sessionError);
 
-    client.startSession(QString::fromUtf8(DUMMY_ADAPTER_PATH), minimalConfig(), QStringList());
+    client.prepareAdapter(QString::fromUtf8(DUMMY_ADAPTER_PATH));
 
     QVERIFY2(spyStarted.wait(cSessionTimeoutMs), "sessionStarted not emitted");
     QCOMPARE(spyError.count(), 0);

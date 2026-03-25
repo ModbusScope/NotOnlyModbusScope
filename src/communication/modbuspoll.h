@@ -20,6 +20,7 @@ public:
     explicit ModbusPoll(SettingsModel* pSettingsModel, QObject* parent = nullptr);
     ~ModbusPoll();
 
+    void initAdapter();
     void startCommunication(QList<ModbusRegister>& registerList);
     void stopCommunication();
 
@@ -32,6 +33,7 @@ signals:
 private slots:
     void triggerRegisterRead();
     void onReadDataResult(ResultDoubleList results);
+    void onDescribeResult(const QJsonObject& description);
 
 private:
     QJsonObject buildAdapterConfig();

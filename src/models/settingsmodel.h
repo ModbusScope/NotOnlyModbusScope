@@ -4,6 +4,7 @@
 #include <QDir>
 #include <QObject>
 
+#include "models/adapterdata.h"
 #include "models/connection.h"
 #include "models/connectiontypes.h"
 #include "models/device.h"
@@ -12,8 +13,7 @@ class SettingsModel : public QObject
 {
     Q_OBJECT
 public:
-
-    explicit SettingsModel(QObject *parent = nullptr);
+    explicit SettingsModel(QObject* parent = nullptr);
     ~SettingsModel();
 
     void triggerUpdate(void);
@@ -41,6 +41,13 @@ public:
     QList<deviceId_t> deviceList();
     QList<deviceId_t> deviceListForConnection(ConnectionTypes::connectionId_t connectionId);
 
+    const AdapterData* adapterData(const QString& adapterId);
+    QStringList adapterIds() const;
+    void removeAdapter(const QString& adapterId);
+
+    void setAdapterCurrentConfig(const QString& adapterId, const QJsonObject& config);
+    void updateAdapterFromDescribe(const QString& adapterId, const QJsonObject& describeResult);
+
     static const QString defaultLogPath()
     {
         const QString cDefaultLogFileName = "ModbusScope-autolog.csv";
@@ -64,6 +71,7 @@ signals:
     void writeDuringLogFileChanged();
     void absoluteTimesChanged();
     void deviceListChanged();
+    void adapterDataChanged(const QString& adapterId);
 
 private:
     typedef struct
@@ -74,13 +82,13 @@ private:
 
     QList<ConnectionSettings> _connectionSettings;
     QMap<deviceId_t, Device> _devices;
+    QMap<QString, AdapterData> _adapters;
 
     quint32 _pollTime;
     bool _bAbsoluteTimes;
 
     bool _bWriteDuringLog;
     QString _writeDuringLogFile;
-
 };
 
 #endif // SETTINGSMODEL_H

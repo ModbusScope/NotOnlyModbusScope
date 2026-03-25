@@ -27,13 +27,26 @@ ModbusPoll::ModbusPoll(SettingsModel* pSettingsModel, QObject* parent) : QObject
 
     connect(_pAdapterClient, &AdapterClient::sessionStarted, this, &ModbusPoll::triggerRegisterRead);
     connect(_pAdapterClient, &AdapterClient::readDataResult, this, &ModbusPoll::onReadDataResult);
+    connect(_pAdapterClient, &AdapterClient::describeResult, this, &ModbusPoll::onDescribeResult);
     connect(_pAdapterClient, &AdapterClient::sessionError, this, [this](QString message) {
         qCWarning(scopeComm) << "AdapterClient error:" << message;
         _bPollActive = false;
     });
+    connect(_pAdapterClient, &AdapterClient::sessionStopped, this, &ModbusPoll::initAdapter);
 }
 
 ModbusPoll::~ModbusPoll() = default;
+
+/*! \brief Prepare the protocol adapter subprocess for use.
+ *
+ * Launches the adapter at the hard-coded path and calls prepareAdapter() on
+ * the client, which triggers the adapter.describe handshake.
+ */
+void ModbusPoll::initAdapter()
+{
+    static constexpr QLatin1StringView cAdapterPath{ "./adapters/dummymodbusadapter" };
+    _pAdapterClient->prepareAdapter(cAdapterPath);
+}
 
 void ModbusPoll::startCommunication(QList<ModbusRegister>& registerList)
 {
@@ -44,10 +57,12 @@ void ModbusPoll::startCommunication(QList<ModbusRegister>& registerList)
 
     resetCommunicationStats();
 
-    static constexpr QLatin1StringView cAdapterPath{ "./modbusadapter" };
-    QJsonObject config = buildAdapterConfig();
     QStringList expressions = buildRegisterExpressions(_registerList);
-    _pAdapterClient->startSession(cAdapterPath, config, expressions);
+
+    const AdapterData* data = _pSettingsModel->adapterData("modbus");
+    QJsonObject config = data->hasStoredConfig() ? data->currentConfig() : buildAdapterConfig();
+
+    _pAdapterClient->provideConfig(config, expressions);
 }
 
 void ModbusPoll::resetCommunicationStats()
@@ -98,6 +113,11 @@ void ModbusPoll::onReadDataResult(ResultDoubleList results)
 
         _pPollTimer->start(static_cast<int>(waitInterval));
     }
+}
+
+void ModbusPoll::onDescribeResult(const QJsonObject& description)
+{
+    _pSettingsModel->updateAdapterFromDescribe("modbus", description);
 }
 
 QJsonObject ModbusPoll::buildAdapterConfig()
