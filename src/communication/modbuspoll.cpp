@@ -1,4 +1,3 @@
-
 #include "communication/modbuspoll.h"
 
 #include "models/connection.h"
@@ -37,12 +36,12 @@ ModbusPoll::ModbusPoll(SettingsModel* pSettingsModel, QObject* parent) : QObject
 
 ModbusPoll::~ModbusPoll() = default;
 
-/*! \brief Prepare the protocol adapter subprocess for use.
+/**
+ * @brief Prepare the protocol adapter subprocess for use by resolving its executable path.
  *
- * Resolves the adapter binary relative to the running executable so the path
- * is correct in the build tree, AppImage, and installed layouts alike.
- * Calls prepareAdapter() on the client, which triggers the adapter.describe
- * handshake.
+ * Resolves the adapter binary path relative to the running executable so the path is correct
+ * in build-tree, AppImage, and installed layouts, then instructs the adapter client to
+ * prepare the adapter, initiating the adapter's describe handshake.
  */
 void ModbusPoll::initAdapter()
 {
@@ -50,6 +49,15 @@ void ModbusPoll::initAdapter()
     _pAdapterClient->prepareAdapter(adapterPath);
 }
 
+/**
+ * @brief Starts Modbus polling using the provided register list.
+ *
+ * Stores the given register list, enables the polling loop, resets poll timing statistics,
+ * constructs register expressions, selects an adapter configuration (uses stored config when available,
+ * otherwise builds one), and provides the configuration and expressions to the adapter client to begin communication.
+ *
+ * @param registerList List of Modbus registers to poll; the list is copied into the poll instance.
+ */
 void ModbusPoll::startCommunication(QList<ModbusRegister>& registerList)
 {
     _registerList = registerList;

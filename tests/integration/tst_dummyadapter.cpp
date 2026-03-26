@@ -25,7 +25,13 @@ QJsonObject minimalConfig()
     return config;
 }
 
-} // namespace
+} /**
+ * @brief Verify that the adapter's describe result contains required top-level fields.
+ *
+ * Waits for the AdapterClient::describeResult signal and asserts the returned JSON object
+ * contains the keys "name", "version", "configVersion", "schema", "defaults", and "capabilities".
+ * Also asserts that no sessionStarted or sessionError signals were emitted during describe.
+ */
 
 void TestDummyAdapter::describeReturnsRequiredFields()
 {
@@ -54,6 +60,12 @@ void TestDummyAdapter::describeReturnsRequiredFields()
     client.stopSession();
 }
 
+/**
+ * @brief Verifies the adapter's describe result reports the expected adapter name.
+ *
+ * Waits for the adapter to emit its describe result and asserts that the "name"
+ * field equals "modbusAdapter". Stops the session afterward.
+ */
 void TestDummyAdapter::describeNameIsModbusAdapter()
 {
     auto* process = new AdapterProcess();
@@ -73,6 +85,13 @@ void TestDummyAdapter::describeNameIsModbusAdapter()
     client.stopSession();
 }
 
+/**
+ * @brief Exercises a full adapter session lifecycle from describe through read and stop.
+ *
+ * Starts an adapter process, supplies a minimal configuration when the adapter's describe
+ * result is received, waits for the session to start (failing the test on timeout or error),
+ * issues a read request and waits for a read result, then stops the session.
+ */
 void TestDummyAdapter::fullLifecycleSessionStarts()
 {
     auto* process = new AdapterProcess();

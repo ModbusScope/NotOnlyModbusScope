@@ -32,6 +32,16 @@ void TestAdapterProcess::startFailsWithBadPath()
     QCOMPARE(spyError.count(), 1);
 }
 
+/**
+ * Verifies that sending an "adapter.describe" request causes a single responseReceived
+ * signal whose payload is a JSON object containing a "name" field.
+ *
+ * Starts the adapter process using DUMMY_ADAPTER_EXECUTABLE, sends the
+ * "adapter.describe" request, stops the process to flush responses, and asserts
+ * that no processError was emitted, exactly one responseReceived was emitted,
+ * the response's method equals "adapter.describe", and the response result is a
+ * JSON object containing the "name" key.
+ */
 void TestAdapterProcess::sendRequestEmitsResponseReceived()
 {
     AdapterProcess process;
@@ -56,6 +66,13 @@ void TestAdapterProcess::sendRequestEmitsResponseReceived()
     QVERIFY(result.contains(QStringLiteral("name")));
 }
 
+/**
+ * @brief Verifies that stopping an AdapterProcess emits the processFinished signal.
+ *
+ * Starts a dummy adapter executable, confirms the process becomes running, stops it,
+ * and asserts the process is no longer running and that exactly one processFinished
+ * signal was emitted.
+ */
 void TestAdapterProcess::processFinishedEmittedOnStop()
 {
     AdapterProcess process;
