@@ -38,7 +38,7 @@ void TestAdapterProcess::sendRequestEmitsResponseReceived()
     QSignalSpy spyResponse(&process, &AdapterProcess::responseReceived);
     QSignalSpy spyProcessError(&process, &AdapterProcess::processError);
 
-    bool started = process.start(QString::fromUtf8(DUMMY_ADAPTER_PATH));
+    bool started = process.start(QString::fromUtf8(DUMMY_ADAPTER_EXECUTABLE));
     QVERIFY2(started, "dummymodbusadapter failed to start");
 
     process.sendRequest(QStringLiteral("adapter.describe"), QJsonObject());
@@ -61,13 +61,66 @@ void TestAdapterProcess::processFinishedEmittedOnStop()
     AdapterProcess process;
     QSignalSpy spyFinished(&process, &AdapterProcess::processFinished);
 
-    QVERIFY(process.start(QString::fromUtf8(DUMMY_ADAPTER_PATH)));
+    QVERIFY(process.start(QString::fromUtf8(DUMMY_ADAPTER_EXECUTABLE)));
     QVERIFY(process.isRunning());
 
     process.stop();
 
     QVERIFY(!process.isRunning());
     QCOMPARE(spyFinished.count(), 1);
+}
+
+void TestAdapterProcess::isRunningAfterStart()
+{
+    AdapterProcess process;
+
+    QVERIFY(!process.isRunning());
+    QVERIFY(process.start(QString::fromUtf8(DUMMY_ADAPTER_EXECUTABLE)));
+    QVERIFY(process.isRunning());
+
+    process.stop();
+    QVERIFY(!process.isRunning());
+}
+
+void TestAdapterProcess::sendRequestBeforeStartEmitsError()
+{
+    AdapterProcess process;
+    QSignalSpy spyError(&process, &AdapterProcess::processError);
+
+    int id = process.sendRequest(QStringLiteral("adapter.describe"), QJsonObject());
+
+    QCOMPARE(id, -1);
+    QCOMPARE(spyError.count(), 1);
+    QVERIFY(spyError.at(0).at(0).toString().contains("not running"));
+}
+
+void TestAdapterProcess::stopWhenNotRunningIsNoOp()
+{
+    AdapterProcess process;
+    QSignalSpy spyError(&process, &AdapterProcess::processError);
+    QSignalSpy spyFinished(&process, &AdapterProcess::processFinished);
+
+    QVERIFY(!process.isRunning());
+    process.stop();
+
+    /* stop() on an idle process must not emit processError or processFinished */
+    QCOMPARE(spyError.count(), 0);
+    QCOMPARE(spyFinished.count(), 0);
+}
+
+void TestAdapterProcess::startAlreadyRunningReturnsTrue()
+{
+    AdapterProcess process;
+
+    QVERIFY(process.start(QString::fromUtf8(DUMMY_ADAPTER_EXECUTABLE)));
+    QVERIFY(process.isRunning());
+
+    /* A second start() call while running must return true without spawning a new process */
+    bool result = process.start(QString::fromUtf8(DUMMY_ADAPTER_EXECUTABLE));
+    QVERIFY(result);
+    QVERIFY(process.isRunning());
+
+    process.stop();
 }
 
 QTEST_GUILESS_MAIN(TestAdapterProcess)

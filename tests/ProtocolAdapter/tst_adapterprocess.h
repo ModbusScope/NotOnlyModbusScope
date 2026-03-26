@@ -14,6 +14,11 @@ private slots:
     void startFailsWithBadPath();
     void sendRequestEmitsResponseReceived();
     void processFinishedEmittedOnStop();
+
+    void isRunningAfterStart();
+    void sendRequestBeforeStartEmitsError();
+    void stopWhenNotRunningIsNoOp();
+    void startAlreadyRunningReturnsTrue();
 };
 
 #endif // TST_ADAPTERPROCESS_H

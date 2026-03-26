@@ -36,7 +36,7 @@ void TestDummyAdapter::describeReturnsRequiredFields()
     QSignalSpy spyStarted(&client, &AdapterClient::sessionStarted);
     QSignalSpy spyError(&client, &AdapterClient::sessionError);
 
-    client.prepareAdapter(QString::fromUtf8(DUMMY_ADAPTER_PATH));
+    client.prepareAdapter(QString::fromUtf8(DUMMY_ADAPTER_EXECUTABLE));
 
     QVERIFY2(spyDescribe.wait(cSessionTimeoutMs), "No describeResult signal received");
     QCOMPARE(spyError.count(), 0);
@@ -62,7 +62,7 @@ void TestDummyAdapter::describeNameIsModbusAdapter()
     QSignalSpy spyDescribe(&client, &AdapterClient::describeResult);
     QSignalSpy spyStarted(&client, &AdapterClient::sessionStarted);
 
-    client.prepareAdapter(QString::fromUtf8(DUMMY_ADAPTER_PATH));
+    client.prepareAdapter(QString::fromUtf8(DUMMY_ADAPTER_EXECUTABLE));
 
     QVERIFY(spyDescribe.wait(cSessionTimeoutMs));
     QCOMPARE(spyStarted.count(), 0);
@@ -85,7 +85,7 @@ void TestDummyAdapter::fullLifecycleSessionStarts()
     QSignalSpy spyStarted(&client, &AdapterClient::sessionStarted);
     QSignalSpy spyError(&client, &AdapterClient::sessionError);
 
-    client.prepareAdapter(QString::fromUtf8(DUMMY_ADAPTER_PATH));
+    client.prepareAdapter(QString::fromUtf8(DUMMY_ADAPTER_EXECUTABLE));
 
     QVERIFY2(spyStarted.wait(cSessionTimeoutMs), "sessionStarted not emitted");
     QCOMPARE(spyError.count(), 0);
@@ -93,6 +93,89 @@ void TestDummyAdapter::fullLifecycleSessionStarts()
     QSignalSpy spyData(&client, &AdapterClient::readDataResult);
     client.requestReadData();
     QVERIFY2(spyData.wait(cReadTimeoutMs), "readDataResult not emitted");
+
+    client.stopSession();
+}
+
+void TestDummyAdapter::describeVersionFieldIsNonEmpty()
+{
+    auto* process = new AdapterProcess();
+    AdapterClient client(process);
+
+    QSignalSpy spyDescribe(&client, &AdapterClient::describeResult);
+
+    client.prepareAdapter(QString::fromUtf8(DUMMY_ADAPTER_EXECUTABLE));
+
+    QVERIFY(spyDescribe.wait(cSessionTimeoutMs));
+
+    QJsonObject result = spyDescribe.at(0).at(0).value<QJsonObject>();
+    QString version = result["version"].toString();
+    QVERIFY2(!version.isEmpty(), "describe 'version' field must not be empty");
+
+    client.stopSession();
+}
+
+void TestDummyAdapter::describeCapabilitiesFieldIsObject()
+{
+    auto* process = new AdapterProcess();
+    AdapterClient client(process);
+
+    QSignalSpy spyDescribe(&client, &AdapterClient::describeResult);
+
+    client.prepareAdapter(QString::fromUtf8(DUMMY_ADAPTER_EXECUTABLE));
+
+    QVERIFY(spyDescribe.wait(cSessionTimeoutMs));
+
+    QJsonObject result = spyDescribe.at(0).at(0).value<QJsonObject>();
+    QVERIFY2(result["capabilities"].isObject(), "describe 'capabilities' field must be a JSON object");
+
+    client.stopSession();
+}
+
+void TestDummyAdapter::stopSessionEmitsSessionStopped()
+{
+    auto* process = new AdapterProcess();
+    AdapterClient client(process);
+
+    QSignalSpy spyDescribe(&client, &AdapterClient::describeResult);
+    QSignalSpy spyStopped(&client, &AdapterClient::sessionStopped);
+
+    client.prepareAdapter(QString::fromUtf8(DUMMY_ADAPTER_EXECUTABLE));
+    QVERIFY(spyDescribe.wait(cSessionTimeoutMs));
+
+    client.stopSession();
+
+    QVERIFY2(spyStopped.wait(cSessionTimeoutMs), "sessionStopped not emitted after stopSession()");
+    QCOMPARE(spyStopped.count(), 1);
+}
+
+void TestDummyAdapter::sessionRestartAfterStop()
+{
+    /* Verifies that the adapter can be launched a second time after an intentional stop.
+     * This exercises the reconnect path that ModbusPoll::initAdapter() relies on when
+     * sessionStopped is re-emitted after stopSession(). */
+    auto* process = new AdapterProcess();
+    AdapterClient client(process);
+
+    QSignalSpy spyDescribe(&client, &AdapterClient::describeResult);
+    QSignalSpy spyStopped(&client, &AdapterClient::sessionStopped);
+    QSignalSpy spyError(&client, &AdapterClient::sessionError);
+
+    /* First session */
+    client.prepareAdapter(QString::fromUtf8(DUMMY_ADAPTER_EXECUTABLE));
+    QVERIFY2(spyDescribe.wait(cSessionTimeoutMs), "First session: describeResult not received");
+    QCOMPARE(spyError.count(), 0);
+
+    client.stopSession();
+    QVERIFY2(spyStopped.wait(cSessionTimeoutMs), "First session: sessionStopped not emitted");
+
+    /* Second session using the same AdapterClient */
+    spyDescribe.clear();
+    spyError.clear();
+
+    client.prepareAdapter(QString::fromUtf8(DUMMY_ADAPTER_EXECUTABLE));
+    QVERIFY2(spyDescribe.wait(cSessionTimeoutMs), "Second session: describeResult not received");
+    QCOMPARE(spyError.count(), 0);
 
     client.stopSession();
 }
