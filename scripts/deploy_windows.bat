@@ -11,11 +11,27 @@ set DEPLOY_DIR=deploy
 set PATH=C:\Program Files (x86)\Inno Setup 6;%PATH%
 
 mkdir %DEPLOY_DIR%
-copy modbusscope.exe %DEPLOY_DIR%
+copy notonlymodbusscope.exe %DEPLOY_DIR%
+IF ERRORLEVEL 1 GOTO errorHandling
+
+REM Copy adapter binaries into the flat deployment directory
+copy %~dp0..\adapters\modbusadapter.exe %DEPLOY_DIR%
+IF ERRORLEVEL 1 GOTO errorHandling
+
+copy %~dp0..\adapters\dummymodbusadapter.exe %DEPLOY_DIR%
 IF ERRORLEVEL 1 GOTO errorHandling
 
 cd %DEPLOY_DIR%
-windeployqt.exe modbusscope.exe --compiler-runtime -verbose 2
+
+REM Run windeployqt on all three executables. Because they share the same Qt
+REM version and output directory, DLLs are written once and cover all binaries.
+windeployqt.exe notonlymodbusscope.exe --compiler-runtime -verbose 2
+IF ERRORLEVEL 1 GOTO errorHandling
+
+windeployqt.exe modbusadapter.exe -verbose 2
+IF ERRORLEVEL 1 GOTO errorHandling
+
+windeployqt.exe dummymodbusadapter.exe -verbose 2
 IF ERRORLEVEL 1 GOTO errorHandling
 
 REM Add OpenSSL dll's
