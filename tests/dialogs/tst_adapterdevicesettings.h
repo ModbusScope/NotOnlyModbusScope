@@ -13,9 +13,10 @@ class TestAdapterDeviceSettings : public QObject
 private slots:
     void noAdapterShowsLabel();
     void devicesPopulateTabsFromConfig();
-    void deviceNameUsedAsTabTitle();
+    void deviceModelNameUsedAsTabTitle();
     void missingNameFallsBackToDeviceN();
     void acceptValuesSavesToAdapterConfig();
+    void acceptValuesSavesDeviceNameToModel();
 
 private:
     //! Populate \a model with an adapter that has a minimal device schema and
