@@ -58,9 +58,9 @@ void TestAdapterData::updateFromDescribe()
     QCOMPARE(data.name(), QStringLiteral("modbusAdapter"));
     QCOMPARE(data.version(), QStringLiteral("1.0.0"));
     QCOMPARE(data.configVersion(), 2);
-    QCOMPARE(data.schema()["type"].toString(), QStringLiteral("object"));
-    QCOMPARE(data.defaults()["version"].toInt(), 1);
-    QCOMPARE(data.capabilities()["supportsHotReload"].toBool(), false);
+    QCOMPARE(data.schema().value("type").toString(), QStringLiteral("object"));
+    QCOMPARE(data.defaults().value("version").toInt(), 1);
+    QCOMPARE(data.capabilities().value("supportsHotReload").toBool(), false);
 }
 
 void TestAdapterData::updateFromDescribeMissingFields()
@@ -171,6 +171,51 @@ void TestAdapterData::settingsModelRemoveAdapter()
 
     model.removeAdapter("modbus");
     QVERIFY(model.adapterIds().isEmpty());
+}
+
+void TestAdapterData::deviceAdapterIdDefaultsToModbus()
+{
+    SettingsModel model;
+
+    QCOMPARE(model.deviceSettings(Device::cFirstDeviceId)->adapterId(), QStringLiteral("modbus"));
+}
+
+void TestAdapterData::deviceSetAndGetAdapterId()
+{
+    Device device;
+    QCOMPARE(device.adapterId(), QStringLiteral("modbus"));
+
+    device.setAdapterId("custom");
+    QCOMPARE(device.adapterId(), QStringLiteral("custom"));
+}
+
+void TestAdapterData::deviceListForAdapterFiltersCorrectly()
+{
+    SettingsModel model;
+
+    /* Default device 1 is modbus; add two more */
+    const deviceId_t idTwo = model.addNewDevice();
+    const deviceId_t idThree = model.addNewDevice();
+
+    model.deviceSettings(Device::cFirstDeviceId)->setAdapterId("modbus");
+    model.deviceSettings(idTwo)->setAdapterId("custom");
+    model.deviceSettings(idThree)->setAdapterId("modbus");
+
+    const QList<deviceId_t> modbusList = model.deviceListForAdapter("modbus");
+    QCOMPARE(modbusList.size(), 2);
+    QVERIFY(modbusList.contains(Device::cFirstDeviceId));
+    QVERIFY(modbusList.contains(idThree));
+
+    const QList<deviceId_t> customList = model.deviceListForAdapter("custom");
+    QCOMPARE(customList.size(), 1);
+    QVERIFY(customList.contains(idTwo));
+}
+
+void TestAdapterData::deviceListForAdapterUnknownReturnsEmpty()
+{
+    SettingsModel model;
+
+    QVERIFY(model.deviceListForAdapter("opcua").isEmpty());
 }
 
 QTEST_GUILESS_MAIN(TestAdapterData)
