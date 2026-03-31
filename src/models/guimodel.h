@@ -3,24 +3,22 @@
 
 #include <QObject>
 
-namespace AxisMode
+namespace AxisMode {
+typedef enum
 {
-    typedef enum
-    {
-        SCALE_AUTO = 0,
-        SCALE_WINDOW_AUTO,
-        SCALE_SLIDING,
-        SCALE_MINMAX,
-        SCALE_MANUAL
-    } AxisScaleOptions;
+    SCALE_AUTO = 0,
+    SCALE_WINDOW_AUTO,
+    SCALE_SLIDING,
+    SCALE_MINMAX,
+    SCALE_MANUAL
+} AxisScaleOptions;
 }
 
 class GuiModel : public QObject
 {
     Q_OBJECT
 public:
-
-    explicit GuiModel(QObject *parent = nullptr);
+    explicit GuiModel(QObject* parent = nullptr);
     ~GuiModel();
 
     static const quint32 cDifferenceMask;
@@ -57,6 +55,7 @@ public:
     QString windowTitle();
     QString projectFilePath();
     QString lastDir();
+    QString lastMbcImportedFile();
     AxisMode::AxisScaleOptions xAxisScalingMode();
     quint32 xAxisSlidingSec();
     AxisMode::AxisScaleOptions yAxisScalingMode();
@@ -75,6 +74,7 @@ public:
 
     void setProjectFilePath(QString path);
     void setLastDir(QString dir);
+    void setLastMbcImportedFile(QString file);
     void setMarkerExpressionMask(quint32 mask);
 
 public slots:
@@ -121,7 +121,6 @@ signals:
 private slots:
 
 private:
-
     void setStartMarkerState(bool bState);
     void setEndMarkerState(bool bState);
     void setMarkerState(bool bState);
@@ -146,6 +145,7 @@ private:
 
     QString _projectFilePath;
     QString _lastDir; // Last directory opened for import/export/load project
+    QString _lastMbcImportedFile;
 
     bool _bHighlightSamples;
     bool _bCursorValues;
@@ -163,7 +163,6 @@ private:
     quint32 _markerExpressionMask;
 
     static const QString _cWindowTitle;
-
 };
 
 #endif // GUIMODEL_H
