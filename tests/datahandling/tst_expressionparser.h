@@ -1,9 +1,11 @@
+#ifndef TEST_EXPRESSIONPARSER_H
+#define TEST_EXPRESSIONPARSER_H
 
-#include "communication/modbusregister.h"
+#include "communication/datapoint.h"
 
 #include <QObject>
 
-class TestExpressionParser: public QObject
+class TestExpressionParser : public QObject
 {
     Q_OBJECT
 private slots:
@@ -32,8 +34,9 @@ private slots:
     void constant();
     void manyRegisters();
 
-    void verifyParsing(QStringList exprList, QList<ModbusRegister> &expectedRegisters, QStringList &expectedExpression);
+    void verifyParsing(QStringList exprList, QList<DataPoint>& expectedDataPoints, QStringList& expectedExpression);
 
 private:
-
 };
+
+#endif // TEST_EXPRESSIONPARSER_H

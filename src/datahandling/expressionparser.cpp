@@ -1,7 +1,7 @@
 #include "expressionparser.h"
 
+#include "models/device.h"
 #include "util/expressionregex.h"
-#include "util/modbusdatatype.h"
 #include "util/scopelogging.h"
 
 const QString ExpressionParser::_cRegisterFunctionTemplate = "r(%1%2)";
@@ -11,15 +11,12 @@ ExpressionParser::ExpressionParser(QStringList& expressions)
     _findRegRegex.setPattern(ExpressionRegex::cMatchRegister);
     _findRegRegex.optimize();
 
-    _regParseRegex.setPattern(ExpressionRegex::cParseReg);
-    _regParseRegex.optimize();
-
     parseExpressions(expressions);
 }
 
-void ExpressionParser::modbusRegisters(QList<ModbusRegister>& registerList)
+void ExpressionParser::dataPoints(QList<DataPoint>& dataPointList)
 {
-    registerList = _modbusRegisters;
+    dataPointList = _dataPoints;
 }
 
 void ExpressionParser::processedExpressions(QStringList& expressionList)
@@ -30,15 +27,15 @@ void ExpressionParser::processedExpressions(QStringList& expressionList)
 void ExpressionParser::parseExpressions(QStringList& expressions)
 {
     _processedExpressions.clear();
-    _modbusRegisters.clear();
+    _dataPoints.clear();
 
-    for(const QString &expression: std::as_const(expressions))
+    for (const QString& expression : std::as_const(expressions))
     {
         _processedExpressions.append(processExpression(expression));
     }
 }
 
-QString ExpressionParser::processExpression(QString const & graphExpr)
+QString ExpressionParser::processExpression(QString const& graphExpr)
 {
     QString resultExpr = graphExpr;
     QRegularExpressionMatchIterator i = _findRegRegex.globalMatch(resultExpr);
@@ -56,10 +53,10 @@ QString ExpressionParser::processExpression(QString const & graphExpr)
         {
             QString regDef = match.captured(0);
 
-            ModbusRegister modbusReg;
-            if (processRegisterExpression(regDef, modbusReg))
+            DataPoint dataPoint;
+            if (processRegisterExpression(regDef, dataPoint))
             {
-                QString regFunc = constructInternalRegisterFunction(modbusReg, regDef.size());
+                QString regFunc = constructInternalRegisterFunction(dataPoint, regDef.size());
                 resultExpr.replace(regDef, regFunc);
             }
         }
@@ -68,48 +65,46 @@ QString ExpressionParser::processExpression(QString const & graphExpr)
     return resultExpr;
 }
 
-bool ExpressionParser::processRegisterExpression(QString regExpr, ModbusRegister& modbusReg)
+bool ExpressionParser::processRegisterExpression(QString regExpr, DataPoint& dataPoint)
 {
-    bool bRet = false;
+    static const QRegularExpression regParseRegex(ExpressionRegex::cParseReg);
+    QRegularExpressionMatch match = regParseRegex.match(regExpr);
 
-    QRegularExpressionMatch match = _regParseRegex.match(regExpr);
-
-    QString strAddress;
-    QString strDeviceId;
-    QString strType;
-
-    if (match.hasMatch())
+    if (!match.hasMatch())
     {
-        strAddress = match.captured(1);
-        strDeviceId = match.captured(2);
-        strType = match.captured(3);
-
-        bRet = true;
-        bRet = bRet && parseAddress(strAddress, modbusReg);
-        bRet = bRet && parseDeviceId(strDeviceId, modbusReg);
-        bRet = bRet && parseType(strType, modbusReg);
-    }
-    else
-    {
-        auto msg = QString("Part of expression evaluation parsing failed (\"%1\")").arg(regExpr);
-        qCWarning(scopeComm) << msg;
-        bRet = false;
+        qCWarning(scopeComm) << QString("Part of expression evaluation parsing failed (\"%1\")").arg(regExpr);
+        return false;
     }
 
-    return bRet;
+    const QString strDeviceId = match.captured(2);
+
+    deviceId_t deviceId = Device::cFirstDeviceId;
+    if (!strDeviceId.isEmpty())
+    {
+        bool ok;
+        deviceId = strDeviceId.toUInt(&ok);
+        if (!ok)
+        {
+            qCWarning(scopeComm) << QString("Parsing device \"%1\" failed").arg(strDeviceId);
+            return false;
+        }
+    }
+
+    dataPoint = DataPoint(regExpr, deviceId);
+    return true;
 }
 
-QString ExpressionParser::constructInternalRegisterFunction(ModbusRegister const & modbusReg, int size)
+QString ExpressionParser::constructInternalRegisterFunction(DataPoint const& dataPoint, int size)
 {
     quint32 idx;
-    if (_modbusRegisters.contains(modbusReg))
+    if (_dataPoints.contains(dataPoint))
     {
-        idx = _modbusRegisters.indexOf(modbusReg);
+        idx = _dataPoints.indexOf(dataPoint);
     }
     else
     {
-        _modbusRegisters.append(modbusReg);
-        idx = _modbusRegisters.size() - 1;
+        _dataPoints.append(dataPoint);
+        idx = _dataPoints.size() - 1;
     }
 
     /* Add dummy whitespaces to make sure positions in internal representations match visible expressions */
@@ -119,68 +114,3 @@ QString ExpressionParser::constructInternalRegisterFunction(ModbusRegister const
 
     return QString(_cRegisterFunctionTemplate).arg(idx).arg(spaces);
 }
-
-bool ExpressionParser::parseAddress(QString strAddr, ModbusRegister& modbusReg)
-{
-    bool bRet = false;
-
-    if (strAddr.isEmpty())
-    {
-        /* Required field */
-        bRet = false;
-        qCWarning(scopeComm) << QString("No address specified");
-    }
-    else
-    {
-        bRet = true;
-        modbusReg.setAddress(ModbusAddress(strAddr));
-    }
-
-    return bRet;
-}
-
-bool ExpressionParser::parseDeviceId(QString strDeviceId, ModbusRegister& modbusReg)
-{
-    bool bRet = false;
-
-    if (strDeviceId.isEmpty())
-    {
-        /* Keep default */
-        bRet = true;
-    }
-    else
-    {
-        auto deviceId = strDeviceId.toUInt(&bRet);
-        if (bRet)
-        {
-            modbusReg.setDeviceId(deviceId);
-        }
-        else
-        {
-            qCWarning(scopeComm) << QString("Parsing device \"%1\" failed").arg(strDeviceId);
-        }
-    }
-
-    return bRet;
-}
-
-bool ExpressionParser::parseType(QString strType, ModbusRegister& modbusReg)
-{
-    bool bRet;
-    bool bOk;
-    ModbusDataType::Type type = ModbusDataType::convertString(strType, bOk);
-
-    if (bOk)
-    {
-        modbusReg.setType(type);
-        bRet = true;
-    }
-    else
-    {
-        bRet = false;
-        qCWarning(scopeComm) << QString("Unknown type \"%1\"").arg(strType);
-    }
-
-    return bRet;
-}
-
