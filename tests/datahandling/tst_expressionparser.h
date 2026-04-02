@@ -24,6 +24,7 @@ private slots:
     void singleRegisterConnType();
     void multiRegisters();
     void multiRegistersDuplicate();
+    void singleExpressionDuplicate();
     void failure();
     void failureMulti();
     void combinations();
@@ -34,7 +35,11 @@ private slots:
     void constant();
     void manyRegisters();
 
-    void verifyParsing(QStringList exprList, QList<DataPoint>& expectedDataPoints, QStringList& expectedExpression);
+    void manyRegistersHighIndex();
+
+    void verifyParsing(const QStringList& exprList,
+                       const QList<DataPoint>& expectedDataPoints,
+                       const QStringList& expectedExpression);
 
 private:
 };
