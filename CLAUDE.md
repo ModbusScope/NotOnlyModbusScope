@@ -2,6 +2,8 @@
 
 ## Build
 
+> **Preferred workflow:** use the sub-agents (`@agent-build`, `@agent-test-runner`, `@agent-quality`) defined in `.claude/agents/` — see the [Development](#development) section. The commands below are provided as reference and fallback only.
+
 All commands run from the **project root** unless noted.
 
 **Requirements:** Qt 6, C++20, Ninja. Compiler flags: `-Wall -Wextra -Werror`.
@@ -33,8 +35,6 @@ clang-format -i src/path/to/file.cpp
 ./scripts/run_clang_tidy.sh src/path/to/file.cpp
 ./scripts/run_clazy.sh src/path/to/file.cpp
 ```
-
-**Always run pre-commit after making source file changes.** All three checks must pass before the work is done.
 
 ## Project Structure
 
@@ -89,4 +89,4 @@ Several sub-agents are defined in `.claude/agents/` to keep build/test/lint outp
 - **`@agent-quality`** - runs clang-format, clang-tidy, and clazy; reports only violations.
 - **`@agent-code-reviewer`** - reviews code for quality, safety, and best practices; provides specific, actionable feedback.
 
-Always use these agents rather than running the commands directly. After making source file changes: build, then run tests, then run quality checks - all must pass before the work is done.
+Always use these agents rather than running the commands directly. After making source file changes: build, then run tests, then run quality checks, then run code review - all required steps must pass before the work is done.
