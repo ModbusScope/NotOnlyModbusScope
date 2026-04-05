@@ -27,6 +27,8 @@ public:
     bool isActive();
     void resetCommunicationStats();
 
+    void onAdapterDiagnostic(const QString& level, const QString& message);
+
 signals:
     void registerDataReady(ResultDoubleList registers);
 

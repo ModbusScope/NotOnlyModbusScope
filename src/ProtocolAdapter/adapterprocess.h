@@ -9,6 +9,7 @@
 #include <QObject>
 #include <QProcess>
 #include <QString>
+#include <QTimer>
 
 /*!
  * \brief Transport layer for an external adapter process communicating via JSON-RPC 2.0 over stdio.
@@ -37,7 +38,11 @@ public:
     virtual bool start(const QString& path);
 
     /*!
-     * \brief Kill the adapter process and wait for it to finish.
+     * \brief Signal the adapter process to stop and return immediately.
+     *
+     * Closes stdin so the adapter exits cleanly. If it has not exited within
+     * the stop timeout, it is killed. The \c processFinished signal is emitted
+     * asynchronously when the process actually exits.
      */
     virtual void stop();
 
@@ -100,6 +105,7 @@ private:
     bool writeFramed(const QByteArray& json);
 
     QProcess* _pProcess;
+    QTimer* _pKillTimer;
     FramingReader* _pFramingReader;
     QMap<int, QString> _pendingMethods;
     int _nextRequestId{ 1 };

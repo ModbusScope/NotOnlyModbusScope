@@ -4,7 +4,8 @@
 
 #include <QJsonArray>
 
-AdapterClient::AdapterClient(AdapterProcess* pProcess, QObject* parent) : QObject(parent), _pProcess(pProcess)
+AdapterClient::AdapterClient(AdapterProcess* pProcess, QObject* parent, int handshakeTimeoutMs)
+    : QObject(parent), _pProcess(pProcess), _handshakeTimeoutMs(handshakeTimeoutMs)
 {
     Q_ASSERT(pProcess);
     _pProcess->setParent(this);
@@ -16,6 +17,7 @@ AdapterClient::AdapterClient(AdapterProcess* pProcess, QObject* parent) : QObjec
     connect(_pProcess, &AdapterProcess::errorReceived, this, &AdapterClient::onErrorReceived);
     connect(_pProcess, &AdapterProcess::processError, this, &AdapterClient::onProcessError);
     connect(_pProcess, &AdapterProcess::processFinished, this, &AdapterClient::onProcessFinished);
+    connect(_pProcess, &AdapterProcess::notificationReceived, this, &AdapterClient::onNotificationReceived);
 }
 
 AdapterClient::~AdapterClient() = default;
@@ -35,7 +37,7 @@ void AdapterClient::prepareAdapter(const QString& adapterPath)
 
     qCInfo(scopeComm) << "AdapterClient: process started, sending initialize";
     _state = State::INITIALIZING;
-    _handshakeTimer.start(cHandshakeTimeoutMs);
+    _handshakeTimer.start(_handshakeTimeoutMs);
     _pProcess->sendRequest("adapter.initialize", QJsonObject());
 }
 
@@ -50,7 +52,7 @@ void AdapterClient::provideConfig(QJsonObject config, QStringList registerExpres
     _pendingExpressions = registerExpressions;
     _pendingConfig = config;
     _state = State::CONFIGURING;
-    _handshakeTimer.start(cHandshakeTimeoutMs);
+    _handshakeTimer.start(_handshakeTimeoutMs);
     QJsonObject params;
     params["config"] = _pendingConfig;
     _pProcess->sendRequest("adapter.configure", params);
@@ -91,12 +93,13 @@ void AdapterClient::stopSession()
     {
         _state = State::STOPPING;
         _pProcess->sendRequest("adapter.shutdown", QJsonObject());
+        _handshakeTimer.start(_handshakeTimeoutMs);
     }
     else
     {
+        _state = State::STOPPING;
         _pProcess->stop();
-        _state = State::IDLE;
-        emit sessionStopped();
+        /* sessionStopped is emitted from onProcessFinished once the process exits */
     }
 }
 
@@ -111,8 +114,10 @@ void AdapterClient::onResponseReceived(int id, const QString& method, const QJso
     {
         qCWarning(scopeComm) << "AdapterClient: unexpected non-object result for" << method;
         _handshakeTimer.stop();
+        /* Set IDLE before stop() so onProcessFinished's IDLE guard suppresses any
+           duplicate sessionError emission when the process exits asynchronously. */
         _state = State::IDLE;
-        QTimer::singleShot(0, this, [this]() { _pProcess->stop(); });
+        _pProcess->stop();
         emit sessionError(QString("Unexpected non-object result for %1").arg(method));
     }
 }
@@ -125,8 +130,10 @@ void AdapterClient::onErrorReceived(int id, const QString& method, const QJsonOb
     qCWarning(scopeComm) << "AdapterClient: error for" << method << ":" << errorMsg;
 
     State previousState = _state;
+    /* Set IDLE before stop() so onProcessFinished's IDLE guard suppresses any
+       duplicate sessionError emission when the process exits asynchronously. */
     _state = State::IDLE;
-    QTimer::singleShot(0, this, [this]() { _pProcess->stop(); });
+    _pProcess->stop();
 
     if (previousState != State::STOPPING)
     {
@@ -137,14 +144,22 @@ void AdapterClient::onErrorReceived(int id, const QString& method, const QJsonOb
 void AdapterClient::onProcessError(const QString& message)
 {
     _handshakeTimer.stop();
-    _state = State::IDLE;
-    emit sessionError(message);
+    if (_state != State::STOPPING)
+    {
+        _state = State::IDLE;
+        emit sessionError(message);
+    }
 }
 
 void AdapterClient::onProcessFinished()
 {
     _handshakeTimer.stop();
-    if (_state != State::IDLE)
+    if (_state == State::STOPPING)
+    {
+        _state = State::IDLE;
+        emit sessionStopped();
+    }
+    else if (_state != State::IDLE)
     {
         _state = State::IDLE;
         emit sessionError("Adapter process exited unexpectedly");
@@ -154,9 +169,35 @@ void AdapterClient::onProcessFinished()
 void AdapterClient::onHandshakeTimeout()
 {
     qCWarning(scopeComm) << "AdapterClient: handshake timed out in state" << static_cast<int>(_state);
+    bool wasStopping = (_state == State::STOPPING);
     _state = State::IDLE;
-    QTimer::singleShot(0, this, [this]() { _pProcess->stop(); });
-    emit sessionError("Adapter handshake timed out");
+    _pProcess->stop();
+    if (wasStopping)
+    {
+        emit sessionStopped();
+    }
+    else
+    {
+        emit sessionError("Adapter handshake timed out");
+    }
+}
+
+void AdapterClient::onNotificationReceived(QString method, QJsonValue params)
+{
+    if (method != QStringLiteral("adapter.diagnostic"))
+    {
+        return;
+    }
+
+    if (!params.isObject())
+    {
+        qCWarning(scopeComm) << "AdapterClient: adapter.diagnostic params is not an object";
+        return;
+    }
+
+    QJsonObject obj = params.toObject();
+    emit diagnosticReceived(obj.value(QStringLiteral("level")).toString(),
+                            obj.value(QStringLiteral("message")).toString());
 }
 
 void AdapterClient::handleLifecycleResponse(const QString& method, const QJsonObject& result)
@@ -215,8 +256,7 @@ void AdapterClient::handleLifecycleResponse(const QString& method, const QJsonOb
     {
         qCInfo(scopeComm) << "AdapterClient: shutdown acknowledged";
         _pProcess->stop();
-        _state = State::IDLE;
-        emit sessionStopped();
+        /* sessionStopped is emitted from onProcessFinished once the process exits */
     }
     else
     {

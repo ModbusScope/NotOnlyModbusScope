@@ -18,14 +18,21 @@ private slots:
     void errorResponseEmitsSessionError();
     void unexpectedResponseEmitsNoSignals();
     void notificationIgnored();
+    void diagnosticNotificationForwarded();
+    void diagnosticNotificationDebugLevel();
+    void diagnosticMalformedParams();
     void processErrorEmitsSessionError();
     void stopSessionDuringLifecycle();
     void doubleStopSession();
     void requestReadDataWhenNotActive();
     void nonObjectResultEmitsSessionError();
     void errorDuringShutdownSuppressed();
+    void shutdownNoAckTimesOutToSessionStopped();
     void awaitingConfigPausesBeforeConfigure();
     void stopSessionDuringAwaitingConfig();
+    void shutdownAckEmitsSessionStoppedAfterProcessExit();
+    void processErrorDuringStoppingNoSessionError();
+    void processErrorDuringStoppingThenProcessFinished();
 };
 
 #endif // TST_ADAPTERCLIENT_H

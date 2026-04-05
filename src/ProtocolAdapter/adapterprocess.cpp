@@ -3,13 +3,24 @@
 #include "util/scopelogging.h"
 
 #include <QJsonDocument>
+#include <QTimer>
 
 static constexpr int cStartTimeoutMs = 3000;
+static constexpr int cStopTimeoutMs = 3000;
 
 AdapterProcess::AdapterProcess(QObject* parent) : QObject(parent)
 {
     _pProcess = new QProcess(this);
     _pFramingReader = new FramingReader(this);
+
+    _pKillTimer = new QTimer(this);
+    _pKillTimer->setSingleShot(true);
+    connect(_pKillTimer, &QTimer::timeout, this, [this]() {
+        if (_pProcess->state() != QProcess::NotRunning)
+        {
+            _pProcess->kill();
+        }
+    });
 
     connect(_pProcess, &QProcess::readyReadStandardOutput, this, &AdapterProcess::onReadyReadStdout);
     connect(_pProcess, &QProcess::readyReadStandardError, this, &AdapterProcess::onReadyReadStderr);
@@ -25,6 +36,7 @@ bool AdapterProcess::start(const QString& path)
         return true;
     }
 
+    _pKillTimer->stop();
     _pendingMethods.clear();
     _nextRequestId = 1;
 
@@ -49,11 +61,8 @@ void AdapterProcess::stop()
     if (_pProcess->state() != QProcess::NotRunning)
     {
         _pProcess->closeWriteChannel();
-        if (!_pProcess->waitForFinished(3000))
-        {
-            _pProcess->kill();
-            _pProcess->waitForFinished(1000);
-        }
+        _pKillTimer->stop();
+        _pKillTimer->start(cStopTimeoutMs);
     }
 }
 
@@ -100,11 +109,10 @@ bool AdapterProcess::writeFramed(const QByteArray& json)
     qint64 written = _pProcess->write(frame);
     if (written != frame.size())
     {
-        emit processError(
-            QString("Failed to write to adapter process (wrote %1 of %2 bytes, error: %3)")
-                .arg(written)
-                .arg(frame.size())
-                .arg(_pProcess->errorString()));
+        emit processError(QString("Failed to write to adapter process (wrote %1 of %2 bytes, error: %3)")
+                            .arg(written)
+                            .arg(frame.size())
+                            .arg(_pProcess->errorString()));
         return false;
     }
     return true;
@@ -171,5 +179,6 @@ void AdapterProcess::onProcessFinished(int exitCode, QProcess::ExitStatus exitSt
 {
     qCInfo(scopeComm) << "AdapterProcess: process finished, exit code:" << exitCode << "status:" << exitStatus;
     _pendingMethods.clear();
+    _pKillTimer->stop();
     emit processFinished();
 }

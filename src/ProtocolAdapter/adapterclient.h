@@ -26,7 +26,7 @@ class AdapterClient : public QObject
     Q_OBJECT
 
 public:
-    explicit AdapterClient(AdapterProcess* pProcess, QObject* parent = nullptr);
+    explicit AdapterClient(AdapterProcess* pProcess, QObject* parent = nullptr, int handshakeTimeoutMs = 10000);
     ~AdapterClient();
 
     /*!
@@ -71,7 +71,10 @@ public:
     void requestStatus();
 
     /*!
-     * \brief Send adapter.shutdown and terminate the adapter process.
+     * \brief Send adapter.shutdown and signal the adapter process to stop.
+     *
+     * The sessionStopped() signal is emitted asynchronously once the process
+     * has fully exited.
      */
     void stopSession();
 
@@ -114,6 +117,13 @@ signals:
      */
     void sessionStopped();
 
+    /*!
+     * \brief Emitted when an adapter.diagnostic notification is received from the adapter.
+     * \param level Severity level string: "debug", "info", or "warning".
+     * \param message The diagnostic message from the adapter.
+     */
+    void diagnosticReceived(QString level, QString message);
+
 protected:
     enum class State
     {
@@ -135,6 +145,7 @@ private slots:
     void onProcessError(const QString& message);
     void onProcessFinished();
     void onHandshakeTimeout();
+    void onNotificationReceived(QString method, QJsonValue params);
 
 private:
     void handleLifecycleResponse(const QString& method, const QJsonObject& result);
@@ -143,6 +154,7 @@ private:
 
     AdapterProcess* _pProcess;
     QTimer _handshakeTimer;
+    int _handshakeTimeoutMs;
     QJsonObject _pendingConfig;
     QStringList _pendingExpressions;
 };

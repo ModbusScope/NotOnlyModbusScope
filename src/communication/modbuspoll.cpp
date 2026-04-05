@@ -28,8 +28,10 @@ ModbusPoll::ModbusPoll(SettingsModel* pSettingsModel, QObject* parent) : QObject
     connect(_pAdapterClient, &AdapterClient::sessionError, this, [this](QString message) {
         qCWarning(scopeComm) << "AdapterClient error:" << message;
         _bPollActive = false;
+        disconnect(_pAdapterClient, &AdapterClient::sessionStopped, this, &ModbusPoll::initAdapter);
     });
     connect(_pAdapterClient, &AdapterClient::sessionStopped, this, &ModbusPoll::initAdapter);
+    connect(_pAdapterClient, &AdapterClient::diagnosticReceived, this, &ModbusPoll::onAdapterDiagnostic);
 }
 
 ModbusPoll::~ModbusPoll() = default;
@@ -51,6 +53,10 @@ void ModbusPoll::startCommunication(QList<DataPoint>& registerList)
 {
     _registerList = registerList;
     _bPollActive = true;
+
+    /* Re-establish auto-restart in case it was disconnected by a prior session error */
+    disconnect(_pAdapterClient, &AdapterClient::sessionStopped, this, &ModbusPoll::initAdapter);
+    connect(_pAdapterClient, &AdapterClient::sessionStopped, this, &ModbusPoll::initAdapter);
 
     qCInfo(scopeComm) << QString("Start logging: %1").arg(FormatDateTime::currentDateTime());
 
@@ -117,6 +123,38 @@ void ModbusPoll::onReadDataResult(ResultDoubleList results)
 void ModbusPoll::onDescribeResult(const QJsonObject& description)
 {
     _pSettingsModel->updateAdapterFromDescribe("modbus", description);
+}
+
+/*! \brief Route an adapter.diagnostic notification to the diagnostics log.
+ *
+ * Maps the adapter's level string to the appropriate Qt logging severity so
+ * the message flows through ScopeLogging into DiagnosticModel.
+ *
+ * \param level Severity string from the adapter: "debug", "info", "warning", or "error".
+ * \param message The diagnostic message text.
+ */
+void ModbusPoll::onAdapterDiagnostic(const QString& level, const QString& message)
+{
+    if (level == QStringLiteral("debug"))
+    {
+        qCDebug(scopeAdapter) << message;
+    }
+    else if (level == QStringLiteral("info"))
+    {
+        qCInfo(scopeAdapter) << message;
+    }
+    else if (level == QStringLiteral("warning"))
+    {
+        qCWarning(scopeAdapter) << message;
+    }
+    else if (level == QStringLiteral("error"))
+    {
+        qCCritical(scopeAdapter) << message;
+    }
+    else
+    {
+        qCWarning(scopeAdapter) << "AdapterClient: unknown diagnostic level:" << level << "-" << message;
+    }
 }
 
 QStringList ModbusPoll::buildRegisterExpressions(const QList<DataPoint>& registerList)
