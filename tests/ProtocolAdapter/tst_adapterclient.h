@@ -33,6 +33,22 @@ private slots:
     void shutdownAckEmitsSessionStoppedAfterProcessExit();
     void processErrorDuringStoppingNoSessionError();
     void processErrorDuringStoppingThenProcessFinished();
+
+    void requestDataPointSchemaEmitsSignal();
+    void requestDataPointSchemaInWrongStateIgnored();
+    void describeDataPointInAwaitingConfig();
+    void describeDataPointInActiveState();
+    void describeDataPointInWrongStateIgnored();
+    void validateDataPointValid();
+    void validateDataPointInvalid();
+    void validateDataPointInActiveState();
+    void validateDataPointInWrongStateIgnored();
+
+    void buildExpressionRequestAndResponse();
+    void buildExpressionInActiveState();
+    void buildExpressionInWrongStateIgnored();
+    void buildExpressionOmitsDefaultDataType();
+    void buildExpressionOmitsDefaultDeviceId();
 };
 
 #endif // TST_ADAPTERCLIENT_H

@@ -202,13 +202,20 @@ void SettingsModel::setAdapterCurrentConfig(const QString& adapterId, const QJso
     emit adapterDataChanged(adapterId);
 }
 
-/*! \brief Update adapter metadata from an adapter.describe response and notify observers.
- *
- * Parses name, version, schema, defaults and capabilities from \a describeResult
- * and stores them in the adapter entry, then emits adapterDataChanged().
- * \param adapterId      The adapter identifier string.
- * \param describeResult The full JSON object returned by adapter.describe.
+/*! \brief Store the data point schema from an adapter.dataPointSchema response and notify observers.
+ * \param adapterId  The adapter identifier string.
+ * \param schema     The full data point schema object (addressSchema, dataTypes, defaultDataType).
  */
+void SettingsModel::setAdapterDataPointSchema(const QString& adapterId, const QJsonObject& schema)
+{
+    if (!_adapters.contains(adapterId))
+    {
+        _adapters[adapterId] = AdapterData();
+    }
+    _adapters[adapterId].setDataPointSchema(schema);
+    emit adapterDataChanged(adapterId);
+}
+
 void SettingsModel::updateAdapterFromDescribe(const QString& adapterId, const QJsonObject& describeResult)
 {
     if (!_adapters.contains(adapterId))

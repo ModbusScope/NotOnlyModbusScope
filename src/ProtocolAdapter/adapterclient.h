@@ -2,9 +2,11 @@
 #define ADAPTERCLIENT_H
 
 #include "ProtocolAdapter/adapterprocess.h"
+#include "models/device.h"
 #include "util/result.h"
 
 #include <QJsonObject>
+#include <QMap>
 #include <QObject>
 #include <QStringList>
 #include <QTimer>
@@ -78,6 +80,46 @@ public:
      */
     void stopSession();
 
+    /*!
+     * \brief Send an adapter.dataPointSchema request to discover the data point UI schema.
+     *
+     * Must only be called after describeResult() has been emitted (i.e., in the
+     * AWAITING_CONFIG state). Emits dataPointSchemaResult() when the adapter responds.
+     */
+    void requestDataPointSchema();
+
+    /*!
+     * \brief Send an adapter.describeDataPoint request to parse a data point expression.
+     *
+     * Can be called in AWAITING_CONFIG or ACTIVE state.
+     * Emits describeDataPointResult() when the adapter responds.
+     *
+     * \param expression The data point expression string to describe.
+     */
+    void describeDataPoint(const QString& expression);
+
+    /*!
+     * \brief Send an adapter.validateDataPoint request to validate a data point expression.
+     *
+     * Can be called in AWAITING_CONFIG or ACTIVE state.
+     * Emits validateDataPointResult() when the adapter responds.
+     *
+     * \param expression The data point expression string to validate.
+     */
+    void validateDataPoint(const QString& expression);
+
+    /*!
+     * \brief Send an adapter.buildExpression request to construct a data point expression string.
+     *
+     * Can be called in AWAITING_CONFIG or ACTIVE state.
+     * Emits buildExpressionResult() when the adapter responds.
+     *
+     * \param addressFields Address field values as returned by the data point schema form (e.g. objectType, address).
+     * \param dataType      Data type identifier (e.g. "16b"). Omitted from params when empty; adapter uses its default.
+     * \param deviceId      Device identifier. Omitted from params when zero; adapter uses its default.
+     */
+    void buildExpression(const QJsonObject& addressFields, const QString& dataType, deviceId_t deviceId);
+
 signals:
     /*!
      * \brief Emitted when the adapter has been initialized, described, configured, and started.
@@ -124,6 +166,31 @@ signals:
      */
     void diagnosticReceived(QString level, QString message);
 
+    /*!
+     * \brief Emitted when an adapter.dataPointSchema response has been received.
+     * \param schema The full data point schema object (addressSchema, dataTypes, defaultDataType).
+     */
+    void dataPointSchemaResult(QJsonObject schema);
+
+    /*!
+     * \brief Emitted when an adapter.describeDataPoint response has been received.
+     * \param result The full result object (valid, fields, description or error).
+     */
+    void describeDataPointResult(QJsonObject result);
+
+    /*!
+     * \brief Emitted when an adapter.validateDataPoint response has been received.
+     * \param valid Whether the expression is valid.
+     * \param error Human-readable error message when valid is false; empty otherwise.
+     */
+    void validateDataPointResult(bool valid, QString error);
+
+    /*!
+     * \brief Emitted when an adapter.buildExpression response has been received.
+     * \param expression The constructed data point expression string (e.g. \c ${h0:f32b}).
+     */
+    void buildExpressionResult(QString expression);
+
 protected:
     enum class State
     {
@@ -148,7 +215,7 @@ private slots:
     void onNotificationReceived(QString method, QJsonValue params);
 
 private:
-    void handleLifecycleResponse(const QString& method, const QJsonObject& result);
+    void handleLifecycleResponse(int id, const QString& method, const QJsonObject& result);
 
     static constexpr int cHandshakeTimeoutMs = 10000;
 
@@ -157,6 +224,7 @@ private:
     int _handshakeTimeoutMs;
     QJsonObject _pendingConfig;
     QStringList _pendingExpressions;
+    QMap<QString, int> _pendingAuxRequests;
 };
 
 #endif // ADAPTERCLIENT_H

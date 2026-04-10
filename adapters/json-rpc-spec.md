@@ -277,6 +277,177 @@ An empty `registers` array is valid and starts polling with no registers configu
 
 ---
 
+### `adapter.dataPointSchema`
+
+Returns the schema for data point expressions — what fields make up a data point address, how they should be rendered in the UI, and available data types. Call this after `adapter.describe` to discover how to build the data point input UI.
+
+**Params:** `{}` (none required)
+
+**Result:**
+```json
+{
+  "addressSchema": {
+    "type": "object",
+    "properties": {
+      "objectType": {
+        "type": "string",
+        "title": "Object type",
+        "enum": ["coil", "discrete input", "input register", "holding register"],
+        "x-enumLabels": ["Coil", "Discrete Input", "Input Register", "Holding Register"]
+      },
+      "address": {
+        "type": "integer",
+        "title": "Address",
+        "minimum": 0,
+        "maximum": 65535
+      },
+      "deviceId": {
+        "type": "integer",
+        "title": "Device ID",
+        "minimum": 1
+      },
+      "dataType": {
+        "type": "string",
+        "title": "Data type"
+      }
+    },
+    "required": ["objectType", "address"]
+  },
+  "dataTypes": [
+    { "id": "16b", "label": "unsigned 16-bit" },
+    { "id": "s16b", "label": "signed 16-bit" },
+    { "id": "32b", "label": "unsigned 32-bit" },
+    { "id": "s32b", "label": "signed 32-bit" },
+    { "id": "f32b", "label": "32-bit float" }
+  ],
+  "defaultDataType": "16b"
+}
+```
+
+| Field | Description |
+| --- | --- |
+| `addressSchema` | JSON Schema describing the address input fields. The core renders this with `SchemaFormWidget` |
+| `dataTypes` | Array of available data types. Each entry has `id` (used in expression strings) and `label` (UI display) |
+| `defaultDataType` | The `id` of the type to pre-select in the UI |
+
+The `addressSchema` follows standard JSON Schema conventions. The core application uses it to dynamically generate the address input portion of the data point dialog, so it must accurately describe all required fields and their constraints. The `dataType` property within `addressSchema` has no `enum` constraint; the available values are supplied by the top-level `dataTypes` array, and `defaultDataType` (`"16b"`) indicates which value to pre-select.
+
+---
+
+### `adapter.describeDataPoint`
+
+Parses a data point expression into structured fields and returns a human-readable description. Used by the core to display data point details in tables and tooltips without understanding protocol-specific address formats.
+
+**Params:**
+```json
+{
+  "expression": "${40001: 16b}"
+}
+```
+
+**Result (valid):**
+```json
+{
+  "valid": true,
+  "fields": {
+    "objectType": "holding register",
+    "address": 0,
+    "deviceId": 1,
+    "dataType": "16b"
+  },
+  "description": "holding register, 0, unsigned 16-bit, device id 1"
+}
+```
+
+**Result (invalid):**
+```json
+{
+  "valid": false,
+  "error": "Unknown type 'xyz'"
+}
+```
+
+| Field | Description |
+| --- | --- |
+| `valid` | Whether the expression is syntactically and semantically valid |
+| `fields` | Structured parsed fields — protocol-specific, but the core treats them as opaque display data |
+| `description` | Human-readable description for display in tables, tooltips, and logs |
+| `error` | Human-readable error message when `valid` is false |
+
+**Errors:**
+- `-32602` — Missing `expression` field
+
+---
+
+### `adapter.validateDataPoint`
+
+Validates a single data point expression string without starting polling. Used for real-time validation feedback in the data point input dialog.
+
+**Params:**
+```json
+{
+  "expression": "${40001: 16b}"
+}
+```
+
+**Result (valid):**
+```json
+{ "valid": true }
+```
+
+**Result (invalid):**
+```json
+{
+  "valid": false,
+  "error": "Unknown type 'xyz'"
+}
+```
+
+| Field | Description |
+| --- | --- |
+| `valid` | Whether the expression is valid |
+| `error` | Human-readable error message when `valid` is false |
+
+**Errors:**
+- `-32602` — Missing `expression` field
+
+---
+
+### `adapter.buildExpression`
+
+Constructs a register expression string from its component parts. The core calls this after the user fills in the register address form and selects a data type and device, so expression syntax stays entirely within the adapter.
+
+**Params:**
+
+```json
+{
+  "fields": {
+    "objectType": "holding register",
+    "address": 0
+  },
+  "dataType": "f32b",
+  "deviceId": 2
+}
+```
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `fields` | object | yes | Address field values as returned by the data point schema form (structure matches `addressSchema` from `adapter.dataPointSchema`) |
+| `dataType` | string | no | Data type identifier (e.g. `"16b"`). Omit to use the adapter default |
+| `deviceId` | integer | no | Device identifier from `adapter.configure`. Omit to use the adapter default |
+
+**Result:**
+
+```json
+{ "expression": "${h0@2:f32b}" }
+```
+
+**Errors:**
+
+- `-32602` — Missing or invalid `fields`; unknown `dataType`
+
+---
+
 ### `adapter.getStatus`
 
 Returns the current poll activity state.

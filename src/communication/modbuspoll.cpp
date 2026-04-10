@@ -1,14 +1,10 @@
 
 #include "communication/modbuspoll.h"
 
-#include "models/device.h"
 #include "models/settingsmodel.h"
 #include "util/formatdatetime.h"
-#include "util/modbusdatatype.h"
 #include "util/scopelogging.h"
 
-#include <QCoreApplication>
-#include <QJsonArray>
 
 ModbusPoll::ModbusPoll(SettingsModel* pSettingsModel, QObject* parent) : QObject(parent), _bPollActive(false)
 {
@@ -19,19 +15,16 @@ ModbusPoll::ModbusPoll(SettingsModel* pSettingsModel, QObject* parent) : QObject
     _pSettingsModel = pSettingsModel;
     _lastPollStart = QDateTime::currentMSecsSinceEpoch();
 
-    _pAdapterProcess = new AdapterProcess(this);
-    _pAdapterClient = new AdapterClient(_pAdapterProcess, this);
+    _pAdapterManager = new AdapterManager(_pSettingsModel, this);
 
-    connect(_pAdapterClient, &AdapterClient::sessionStarted, this, &ModbusPoll::triggerRegisterRead);
-    connect(_pAdapterClient, &AdapterClient::readDataResult, this, &ModbusPoll::onReadDataResult);
-    connect(_pAdapterClient, &AdapterClient::describeResult, this, &ModbusPoll::onDescribeResult);
-    connect(_pAdapterClient, &AdapterClient::sessionError, this, [this](QString message) {
-        qCWarning(scopeComm) << "AdapterClient error:" << message;
+    connect(_pAdapterManager, &AdapterManager::sessionStarted, this, &ModbusPoll::triggerRegisterRead);
+    connect(_pAdapterManager, &AdapterManager::readDataResult, this, &ModbusPoll::onReadDataResult);
+    connect(_pAdapterManager, &AdapterManager::sessionStopped, this, &ModbusPoll::initAdapter);
+    connect(_pAdapterManager, &AdapterManager::sessionError, this, [this](QString message) {
+        qCWarning(scopeComm) << "AdapterManager error:" << message;
         _bPollActive = false;
-        disconnect(_pAdapterClient, &AdapterClient::sessionStopped, this, &ModbusPoll::initAdapter);
+        disconnect(_pAdapterManager, &AdapterManager::sessionStopped, this, &ModbusPoll::initAdapter);
     });
-    connect(_pAdapterClient, &AdapterClient::sessionStopped, this, &ModbusPoll::initAdapter);
-    connect(_pAdapterClient, &AdapterClient::diagnosticReceived, this, &ModbusPoll::onAdapterDiagnostic);
 }
 
 ModbusPoll::~ModbusPoll() = default;
@@ -40,13 +33,11 @@ ModbusPoll::~ModbusPoll() = default;
  *
  * Resolves the adapter binary relative to the running executable so the path
  * is correct in the build tree, AppImage, and installed layouts alike.
- * Calls prepareAdapter() on the client, which triggers the adapter.describe
- * handshake.
+ * Delegates to AdapterManager::initAdapter().
  */
 void ModbusPoll::initAdapter()
 {
-    const QString adapterPath = QCoreApplication::applicationDirPath() + "/modbusadapter";
-    _pAdapterClient->prepareAdapter(adapterPath);
+    _pAdapterManager->initAdapter();
 }
 
 void ModbusPoll::startCommunication(QList<DataPoint>& registerList)
@@ -55,19 +46,15 @@ void ModbusPoll::startCommunication(QList<DataPoint>& registerList)
     _bPollActive = true;
 
     /* Re-establish auto-restart in case it was disconnected by a prior session error */
-    disconnect(_pAdapterClient, &AdapterClient::sessionStopped, this, &ModbusPoll::initAdapter);
-    connect(_pAdapterClient, &AdapterClient::sessionStopped, this, &ModbusPoll::initAdapter);
+    disconnect(_pAdapterManager, &AdapterManager::sessionStopped, this, &ModbusPoll::initAdapter);
+    connect(_pAdapterManager, &AdapterManager::sessionStopped, this, &ModbusPoll::initAdapter);
 
     qCInfo(scopeComm) << QString("Start logging: %1").arg(FormatDateTime::currentDateTime());
 
     resetCommunicationStats();
 
     QStringList expressions = buildRegisterExpressions(_registerList);
-
-    const AdapterData* data = _pSettingsModel->adapterData("modbus");
-    QJsonObject config = data->effectiveConfig();
-
-    _pAdapterClient->provideConfig(config, expressions);
+    _pAdapterManager->startSession(expressions);
 }
 
 void ModbusPoll::resetCommunicationStats()
@@ -79,7 +66,7 @@ void ModbusPoll::stopCommunication()
 {
     _bPollActive = false;
     _pPollTimer->stop();
-    _pAdapterClient->stopSession();
+    _pAdapterManager->stopSession();
 
     qCInfo(scopeComm) << QString("Stop logging: %1").arg(FormatDateTime::currentDateTime());
 }
@@ -94,7 +81,7 @@ void ModbusPoll::triggerRegisterRead()
     if (_bPollActive)
     {
         _lastPollStart = QDateTime::currentMSecsSinceEpoch();
-        _pAdapterClient->requestReadData();
+        _pAdapterManager->requestReadData();
     }
 }
 
@@ -120,41 +107,11 @@ void ModbusPoll::onReadDataResult(ResultDoubleList results)
     }
 }
 
-void ModbusPoll::onDescribeResult(const QJsonObject& description)
-{
-    _pSettingsModel->updateAdapterFromDescribe("modbus", description);
-}
 
-/*! \brief Route an adapter.diagnostic notification to the diagnostics log.
- *
- * Maps the adapter's level string to the appropriate Qt logging severity so
- * the message flows through ScopeLogging into DiagnosticModel.
- *
- * \param level Severity string from the adapter: "debug", "info", "warning", or "error".
- * \param message The diagnostic message text.
- */
-void ModbusPoll::onAdapterDiagnostic(const QString& level, const QString& message)
+/*! \brief Returns the AdapterManager owned by this instance. */
+AdapterManager* ModbusPoll::adapterManager() const
 {
-    if (level == QStringLiteral("debug"))
-    {
-        qCDebug(scopeAdapter) << message;
-    }
-    else if (level == QStringLiteral("info"))
-    {
-        qCInfo(scopeAdapter) << message;
-    }
-    else if (level == QStringLiteral("warning"))
-    {
-        qCWarning(scopeAdapter) << message;
-    }
-    else if (level == QStringLiteral("error"))
-    {
-        qCCritical(scopeAdapter) << message;
-    }
-    else
-    {
-        qCWarning(scopeAdapter) << "AdapterClient: unknown diagnostic level:" << level << "-" << message;
-    }
+    return _pAdapterManager;
 }
 
 QStringList ModbusPoll::buildRegisterExpressions(const QList<DataPoint>& registerList)

@@ -1,12 +1,10 @@
 #ifndef MODBUSPOLL_H
 #define MODBUSPOLL_H
 
-#include "ProtocolAdapter/adapterclient.h"
-#include "ProtocolAdapter/adapterprocess.h"
+#include "ProtocolAdapter/adaptermanager.h"
 #include "communication/datapoint.h"
 #include "util/result.h"
 
-#include <QJsonObject>
 #include <QStringList>
 #include <QTimer>
 
@@ -27,7 +25,13 @@ public:
     bool isActive();
     void resetCommunicationStats();
 
-    void onAdapterDiagnostic(const QString& level, const QString& message);
+    /*!
+     * \brief Returns the AdapterManager owned by this poll instance.
+     *
+     * Callers that need to interact with the adapter directly (e.g. to call
+     * buildExpression()) should use this accessor rather than going through ModbusPoll.
+     */
+    AdapterManager* adapterManager() const;
 
 signals:
     void registerDataReady(ResultDoubleList registers);
@@ -35,7 +39,6 @@ signals:
 private slots:
     void triggerRegisterRead();
     void onReadDataResult(ResultDoubleList results);
-    void onDescribeResult(const QJsonObject& description);
 
 private:
     QStringList buildRegisterExpressions(const QList<DataPoint>& registerList);
@@ -47,8 +50,7 @@ private:
     qint64 _lastPollStart;
 
     SettingsModel* _pSettingsModel;
-    AdapterProcess* _pAdapterProcess;
-    AdapterClient* _pAdapterClient;
+    AdapterManager* _pAdapterManager;
 };
 
 #endif // MODBUSPOLL_H

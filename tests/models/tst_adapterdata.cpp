@@ -131,6 +131,7 @@ void TestAdapterData::settingsModelAdapterDataCreatesEntry()
     /* First access creates a default entry */
     const AdapterData* data = model.adapterData("modbus");
     QVERIFY(data != nullptr);
+    // NOLINTNEXTLINE(clang-analyzer-core.CallAndMessage) -- QVERIFY aborts if null
     QVERIFY(data->name().isEmpty());
 
     /* updateAdapterFromDescribe updates the same entry in place */
@@ -171,6 +172,51 @@ void TestAdapterData::settingsModelRemoveAdapter()
 
     model.removeAdapter("modbus");
     QVERIFY(model.adapterIds().isEmpty());
+}
+
+void TestAdapterData::dataPointSchemaDefaultEmpty()
+{
+    AdapterData data;
+    QVERIFY(data.dataPointSchema().isEmpty());
+}
+
+void TestAdapterData::setAndGetDataPointSchema()
+{
+    AdapterData data;
+
+    QJsonObject addressSchema;
+    addressSchema["type"] = QStringLiteral("object");
+
+    QJsonArray dataTypes;
+    QJsonObject type16b;
+    type16b["id"] = QStringLiteral("16b");
+    type16b["label"] = QStringLiteral("Unsigned 16-bit");
+    dataTypes.append(type16b);
+
+    QJsonObject schema;
+    schema["addressSchema"] = addressSchema;
+    schema["dataTypes"] = dataTypes;
+    schema["defaultDataType"] = QStringLiteral("16b");
+
+    data.setDataPointSchema(schema);
+
+    const QJsonObject stored = data.dataPointSchema();
+    QCOMPARE(stored["defaultDataType"].toString(), QStringLiteral("16b"));
+    QCOMPARE(stored["dataTypes"].toArray().size(), 1);
+}
+
+void TestAdapterData::settingsModelSetAdapterDataPointSchema()
+{
+    SettingsModel model;
+
+    QJsonObject schema;
+    schema["defaultDataType"] = QStringLiteral("16b");
+
+    model.setAdapterDataPointSchema("modbus", schema);
+
+    const AdapterData* data = model.adapterData("modbus");
+    const QJsonObject stored = data->dataPointSchema();
+    QCOMPARE(stored["defaultDataType"].toString(), QStringLiteral("16b"));
 }
 
 void TestAdapterData::deviceAdapterIdDefaultsToModbus()
