@@ -17,6 +17,7 @@ private slots:
     void arrayPropertyCreatesTabWidget();
     void objectPropertyCreatesSingleForm();
     void addTabUsesPropertyDefaults();
+    void addTabIncrementsId();
     void acceptValuesStoresConfigInAdapterData();
 };
 

@@ -184,6 +184,54 @@ void TestAdapterSettings::addTabUsesPropertyDefaults()
     QCOMPARE(form->values().value("port").toInt(), 502);
 }
 
+void TestAdapterSettings::addTabIncrementsId()
+{
+    SettingsModel model;
+
+    QJsonObject idProp;
+    idProp["type"] = "integer";
+    idProp["title"] = "Id";
+    QJsonObject portProp;
+    portProp["type"] = "integer";
+    portProp["title"] = "Port";
+    QJsonObject itemProps;
+    itemProps["id"] = idProp;
+    itemProps["port"] = portProp;
+
+    QJsonObject describe = makeDescribeResult("connections", "array", itemProps);
+
+    QJsonObject defaultConn;
+    defaultConn["port"] = 502;
+    /* intentionally omit "id" from defaults to ensure addItemTab() assigns it */
+    QJsonObject defaults;
+    defaults["connections"] = QJsonArray{ defaultConn };
+    describe["defaults"] = defaults;
+
+    model.updateAdapterFromDescribe("testAdapter", describe);
+
+    QJsonObject config;
+    config["connections"] = QJsonArray();
+    model.setAdapterCurrentConfig("testAdapter", config);
+
+    AdapterSettings w(&model, "testAdapter", "connections");
+
+    auto* tabs = w.findChild<AddableTabWidget*>();
+    QVERIFY(tabs != nullptr);
+
+    emit tabs->addTabRequested();
+    emit tabs->addTabRequested();
+
+    QCOMPARE(tabs->count(), 2);
+
+    auto* form0 = qobject_cast<SchemaFormWidget*>(tabs->tabContent(0));
+    QVERIFY(form0 != nullptr);
+    QCOMPARE(form0->values().value("id").toInt(), 1);
+
+    auto* form1 = qobject_cast<SchemaFormWidget*>(tabs->tabContent(1));
+    QVERIFY(form1 != nullptr);
+    QCOMPARE(form1->values().value("id").toInt(), 2);
+}
+
 void TestAdapterSettings::acceptValuesStoresConfigInAdapterData()
 {
     SettingsModel model;

@@ -95,6 +95,10 @@ void AdapterSettings::addItemTab()
     {
         defaultValues = defaultItems.first().toObject();
     }
+    if (_itemSchema.value("properties").toObject().contains("id"))
+    {
+        defaultValues["id"] = _nextItemTabIndex;
+    }
     form->setSchema(_itemSchema, defaultValues);
     const QString name = formatTabName(_nextItemTabIndex);
     _nextItemTabIndex++;
