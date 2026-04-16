@@ -5,6 +5,7 @@
 #include "dialogs/adapterdevicesettings.h"
 #include "models/settingsmodel.h"
 
+#include <QComboBox>
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QLabel>
@@ -229,7 +230,80 @@ void TestAdapterDeviceSettings::addTabUsesDeviceDefaults()
 
     auto* spin = tab->findChild<QSpinBox*>();
     QVERIFY(spin != nullptr);
-    QCOMPARE(spin->value(), 5);
+    // The adapter default id (5) must be overridden with a unique SettingsModel id.
+    const int assignedId = spin->value();
+    QVERIFY(assignedId != 5);
+    QVERIFY(model.hasDevice(static_cast<deviceId_t>(assignedId)));
+    QCOMPARE(model.deviceSettings(static_cast<deviceId_t>(assignedId))->adapterId(), QStringLiteral("adapterA"));
+}
+
+void TestAdapterDeviceSettings::addTabIncrementsDeviceId()
+{
+    SettingsModel model;
+    setupAdapter(model, "adapterA", QJsonArray());
+
+    AdapterDeviceSettings w(&model);
+
+    auto* tabs = w.findChild<AddableTabWidget*>();
+    QVERIFY(tabs != nullptr);
+    QCOMPARE(tabs->count(), 0);
+
+    emit tabs->addTabRequested();
+    emit tabs->addTabRequested();
+
+    QCOMPARE(tabs->count(), 2);
+
+    auto* tab0 = qobject_cast<DeviceConfigTab*>(tabs->tabContent(0));
+    auto* tab1 = qobject_cast<DeviceConfigTab*>(tabs->tabContent(1));
+    QVERIFY(tab0 != nullptr);
+    QVERIFY(tab1 != nullptr);
+
+    const int id0 = tab0->values().value("id").toInt(-1);
+    const int id1 = tab1->values().value("id").toInt(-1);
+
+    QVERIFY(id0 >= 1);
+    QVERIFY(id1 > id0);
+
+    // Both ids must be present in the SettingsModel and linked to the adapter.
+    QVERIFY(model.hasDevice(static_cast<deviceId_t>(id0)));
+    QVERIFY(model.hasDevice(static_cast<deviceId_t>(id1)));
+    QCOMPARE(model.deviceSettings(static_cast<deviceId_t>(id0))->adapterId(), QStringLiteral("adapterA"));
+    QCOMPARE(model.deviceSettings(static_cast<deviceId_t>(id1))->adapterId(), QStringLiteral("adapterA"));
+}
+
+void TestAdapterDeviceSettings::deviceIdPreservedWhenAdapterChanged()
+{
+    SettingsModel model;
+    setupAdapter(model, "adapterA", QJsonArray());
+    setupAdapter(model, "adapterB", QJsonArray());
+
+    AdapterDeviceSettings w(&model);
+
+    auto* tabs = w.findChild<AddableTabWidget*>();
+    QVERIFY(tabs != nullptr);
+
+    emit tabs->addTabRequested();
+
+    QCOMPARE(tabs->count(), 1);
+    auto* tab = qobject_cast<DeviceConfigTab*>(tabs->tabContent(0));
+    QVERIFY(tab != nullptr);
+
+    const int originalId = tab->values().value("id").toInt(-1);
+    QVERIFY(originalId >= 1);
+
+    // Trigger DeviceConfigTab::onAdapterChanged by switching the adapter combo
+    auto* adapterCombo = tab->findChild<QComboBox*>();
+    QVERIFY(adapterCombo != nullptr);
+    int adapterBIdx = adapterCombo->findData(QStringLiteral("adapterB"));
+    QVERIFY(adapterBIdx >= 0);
+    adapterCombo->setCurrentIndex(adapterBIdx);
+
+    // The device ID must be preserved across the adapter switch
+    QCOMPARE(tab->values().value("id").toInt(-1), originalId);
+    // The device must still exist in the model
+    QVERIFY(model.hasDevice(static_cast<deviceId_t>(originalId)));
+    // The tab must now report the new adapter
+    QCOMPARE(tab->adapterId(), QStringLiteral("adapterB"));
 }
 
 QTEST_MAIN(TestAdapterDeviceSettings)
