@@ -201,16 +201,22 @@ void TestAdapterSettings::addTabIncrementsId()
     QJsonObject describe = makeDescribeResult("connections", "array", itemProps);
 
     QJsonObject defaultConn;
+    defaultConn["id"] = 1;
     defaultConn["port"] = 502;
-    /* intentionally omit "id" from defaults to ensure addItemTab() assigns it */
     QJsonObject defaults;
     defaults["connections"] = QJsonArray{ defaultConn };
     describe["defaults"] = defaults;
 
     model.updateAdapterFromDescribe("testAdapter", describe);
 
+    /* Seed one existing connection so _nextItemTabIndex starts at 2, making the
+       default id (1) and the expected new id (2) distinct — a naive default-copy
+       would produce id=1 on the new tab instead of the correct id=2. */
+    QJsonObject existingConn;
+    existingConn["id"] = 1;
+    existingConn["port"] = 502;
     QJsonObject config;
-    config["connections"] = QJsonArray();
+    config["connections"] = QJsonArray{ existingConn };
     model.setAdapterCurrentConfig("testAdapter", config);
 
     AdapterSettings w(&model, "testAdapter", "connections");
@@ -219,14 +225,10 @@ void TestAdapterSettings::addTabIncrementsId()
     QVERIFY(tabs != nullptr);
 
     emit tabs->addTabRequested();
-    emit tabs->addTabRequested();
 
     QCOMPARE(tabs->count(), 2);
 
-    auto* form0 = qobject_cast<SchemaFormWidget*>(tabs->tabContent(0));
-    QVERIFY(form0 != nullptr);
-    QCOMPARE(form0->values().value("id").toInt(), 1);
-
+    /* The newly added tab must receive id=2, not reuse the default id=1. */
     auto* form1 = qobject_cast<SchemaFormWidget*>(tabs->tabContent(1));
     QVERIFY(form1 != nullptr);
     QCOMPARE(form1->values().value("id").toInt(), 2);
