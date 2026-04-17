@@ -120,6 +120,14 @@ public:
      */
     void buildExpression(const QJsonObject& addressFields, const QString& dataType, deviceId_t deviceId);
 
+    /*!
+     * \brief Send an adapter.expressionHelp request to retrieve expression syntax help text.
+     *
+     * Can be called in AWAITING_CONFIG or ACTIVE state.
+     * Emits expressionHelpResult() when the adapter responds.
+     */
+    void requestExpressionHelp();
+
 signals:
     /*!
      * \brief Emitted when the adapter has been initialized, described, configured, and started.
@@ -191,6 +199,12 @@ signals:
      */
     void buildExpressionResult(QString expression);
 
+    /*!
+     * \brief Emitted when an adapter.expressionHelp response has been received.
+     * \param helpText HTML string describing expression syntax.
+     */
+    void expressionHelpResult(QString helpText);
+
 protected:
     enum class State
     {
@@ -216,6 +230,7 @@ private slots:
 
 private:
     void handleLifecycleResponse(int id, const QString& method, const QJsonObject& result);
+    bool consumeAuxResponse(const QString& method, int id);
 
     static constexpr int cHandshakeTimeoutMs = 10000;
 
