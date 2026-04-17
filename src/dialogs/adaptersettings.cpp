@@ -95,6 +95,13 @@ void AdapterSettings::addItemTab()
     {
         defaultValues = defaultItems.first().toObject();
     }
+
+    const QJsonObject idProp = _itemSchema.value("properties").toObject().value("id").toObject();
+    if (!idProp.isEmpty() && idProp.value("type").toString() == "integer")
+    {
+        defaultValues["id"] = _nextItemTabIndex;
+    }
+
     form->setSchema(_itemSchema, defaultValues);
     const QString name = formatTabName(_nextItemTabIndex);
     _nextItemTabIndex++;
