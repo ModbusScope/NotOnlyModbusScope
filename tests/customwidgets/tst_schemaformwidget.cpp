@@ -361,6 +361,10 @@ void TestSchemaFormWidget::conditionalSwitchShowsSerialHidesTcp()
         }
     }
     QVERIFY(typeCombo != nullptr);
+    if (typeCombo == nullptr)
+    {
+        return;
+    }
     typeCombo->setCurrentIndex(typeCombo->findData(QStringLiteral("serial")));
 
     const QJsonObject result = w.values();
@@ -446,7 +450,7 @@ void TestSchemaFormWidget::integerEnumMissingValueUsesSchemaDefault()
     auto* combo = w.findChild<QComboBox*>();
     QVERIFY(combo != nullptr);
     QCOMPARE(combo->currentText(), QStringLiteral("19200"));
-    QCOMPARE(w.values()["baudrate"].toInt(), 19200);
+    QCOMPARE(w.values().value("baudrate").toInt(), 19200);
 }
 
 void TestSchemaFormWidget::stringEnumMissingValueUsesSchemaDefault()
@@ -463,7 +467,7 @@ void TestSchemaFormWidget::stringEnumMissingValueUsesSchemaDefault()
     auto* combo = w.findChild<QComboBox*>();
     QVERIFY(combo != nullptr);
     QCOMPARE(combo->currentText(), QStringLiteral("None"));
-    QCOMPARE(w.values()["parity"].toString(), QStringLiteral("N"));
+    QCOMPARE(w.values().value("parity").toString(), QStringLiteral("N"));
 }
 
 void TestSchemaFormWidget::integerEnumMissingValueNoSchemaDefaultUsesFirstItem()
@@ -478,7 +482,7 @@ void TestSchemaFormWidget::integerEnumMissingValueNoSchemaDefaultUsesFirstItem()
     auto* combo = w.findChild<QComboBox*>();
     QVERIFY(combo != nullptr);
     QCOMPARE(combo->currentIndex(), 0);
-    QCOMPARE(w.values()["baudrate"].toInt(), 1200);
+    QCOMPARE(w.values().value("baudrate").toInt(), 1200);
 }
 
 void TestSchemaFormWidget::conditionalWithoutIfRequiredShowsCorrectFields()
