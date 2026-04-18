@@ -85,7 +85,8 @@ QString AdapterSettings::formatTabName(int index) const
     {
         return QString("Item %1").arg(index);
     }
-    return QString("%1 %2").arg(_propertyKey[0].toUpper() + _propertyKey.mid(1)).arg(index);
+    QString label = _propertyKey.endsWith('s') ? _propertyKey.chopped(1) : _propertyKey;
+    return QString("%1 %2").arg(label[0].toUpper() + label.mid(1)).arg(index);
 }
 
 void AdapterSettings::connectTabNameTracking(SchemaFormWidget* form)

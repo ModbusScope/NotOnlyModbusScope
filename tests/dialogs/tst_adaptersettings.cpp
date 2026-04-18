@@ -279,7 +279,7 @@ void TestAdapterSettings::addTabInitializesNameToConnectionId()
     QCOMPARE(tabs->count(), 3);
     auto* form = qobject_cast<SchemaFormWidget*>(tabs->tabContent(2));
     QVERIFY(form != nullptr);
-    QCOMPARE(form->values().value("name").toString(), QStringLiteral("Connections 3"));
+    QCOMPARE(form->values().value("name").toString(), QStringLiteral("Connection 3"));
 }
 
 void TestAdapterSettings::tabNameUsesNameFieldOnLoad()
