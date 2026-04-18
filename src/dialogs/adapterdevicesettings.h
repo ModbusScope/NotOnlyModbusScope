@@ -6,6 +6,7 @@
 
 class SettingsModel;
 class AddableTabWidget;
+class DeviceConfigTab;
 
 /*!
  * \brief Settings page for adapter device configuration.
@@ -32,6 +33,7 @@ private slots:
 
 private:
     QString constructTabName(const QJsonObject& deviceValues, int tabIndex) const;
+    void connectTabNameTracking(DeviceConfigTab* tab);
 
     SettingsModel* _pSettingsModel;
     AddableTabWidget* _pDeviceTabs{ nullptr };

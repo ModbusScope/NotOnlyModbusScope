@@ -66,6 +66,7 @@ DeviceConfigTab::DeviceConfigTab(SettingsModel* pSettingsModel,
         _pAdapterCombo->setCurrentIndex(idx);
     }
 
+    connect(_pNameEdit, &QLineEdit::textChanged, this, &DeviceConfigTab::nameChanged);
     connect(_pAdapterCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
             &DeviceConfigTab::onAdapterChanged);
 

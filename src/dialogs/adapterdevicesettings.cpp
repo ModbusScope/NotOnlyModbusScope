@@ -52,6 +52,7 @@ AdapterDeviceSettings::AdapterDeviceSettings(SettingsModel* pSettingsModel, QWid
         for (const auto& device : devices)
         {
             auto* tab = new DeviceConfigTab(pSettingsModel, adapterId, device.toObject(), _pDeviceTabs);
+            connectTabNameTracking(tab);
             pages.append(tab);
             names.append(constructTabName(device.toObject(), tabIndex++));
         }
@@ -102,7 +103,14 @@ void AdapterDeviceSettings::handleAddTab()
 
     int tabIndex = _pDeviceTabs->count() + 1;
     auto* tab = new DeviceConfigTab(_pSettingsModel, defaultAdapterId, defaultValues, _pDeviceTabs);
+    connectTabNameTracking(tab);
     _pDeviceTabs->addNewTab(constructTabName(defaultValues, tabIndex), tab);
+}
+
+void AdapterDeviceSettings::connectTabNameTracking(DeviceConfigTab* tab)
+{
+    connect(tab, &DeviceConfigTab::nameChanged, this,
+            [this, tab](const QString& name) { _pDeviceTabs->setTabName(_pDeviceTabs->indexOf(tab), name); });
 }
 
 QString AdapterDeviceSettings::constructTabName(const QJsonObject& deviceValues, int tabIndex) const

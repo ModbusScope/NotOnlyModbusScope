@@ -46,6 +46,10 @@ public:
      */
     QString deviceName() const;
 
+signals:
+    //! Emitted when the device name field changes.
+    void nameChanged(const QString& name);
+
 private slots:
     void onAdapterChanged(int index);
 
