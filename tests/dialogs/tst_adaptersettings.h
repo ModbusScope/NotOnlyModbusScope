@@ -18,6 +18,7 @@ private slots:
     void objectPropertyCreatesSingleForm();
     void addTabUsesPropertyDefaults();
     void addTabUsesNextIndexForId();
+    void addTabInitializesNameToConnectionId();
     void acceptValuesStoresConfigInAdapterData();
 };
 

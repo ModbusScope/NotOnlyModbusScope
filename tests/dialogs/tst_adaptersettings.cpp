@@ -233,6 +233,55 @@ void TestAdapterSettings::addTabUsesNextIndexForId()
     QCOMPARE(form->values().value("id").toInt(), 3);
 }
 
+void TestAdapterSettings::addTabInitializesNameToConnectionId()
+{
+    SettingsModel model;
+
+    QJsonObject idProp;
+    idProp["type"] = "integer";
+    idProp["title"] = "ID";
+    QJsonObject nameProp;
+    nameProp["type"] = "string";
+    nameProp["title"] = "Connection Name";
+    QJsonObject itemProps;
+    itemProps["id"] = idProp;
+    itemProps["name"] = nameProp;
+
+    QJsonObject describe = makeDescribeResult("connections", "array", itemProps);
+
+    QJsonObject defaultConn;
+    defaultConn["id"] = 1;
+    defaultConn["name"] = "Connection 1";
+    QJsonObject defaults;
+    defaults["connections"] = QJsonArray{ defaultConn };
+    describe["defaults"] = defaults;
+
+    model.updateAdapterFromDescribe("testAdapter", describe);
+
+    QJsonObject conn0;
+    conn0["id"] = 1;
+    conn0["name"] = "Connection 1";
+    QJsonObject conn1;
+    conn1["id"] = 2;
+    conn1["name"] = "Connection 2";
+    QJsonObject config;
+    config["connections"] = QJsonArray{ conn0, conn1 };
+    model.setAdapterCurrentConfig("testAdapter", config);
+
+    AdapterSettings w(&model, "testAdapter", "connections");
+
+    auto* tabs = w.findChild<AddableTabWidget*>();
+    QVERIFY(tabs != nullptr);
+    QCOMPARE(tabs->count(), 2);
+
+    emit tabs->addTabRequested();
+
+    QCOMPARE(tabs->count(), 3);
+    auto* form = qobject_cast<SchemaFormWidget*>(tabs->tabContent(2));
+    QVERIFY(form != nullptr);
+    QCOMPARE(form->values().value("name").toString(), QStringLiteral("Connections 3"));
+}
+
 void TestAdapterSettings::acceptValuesStoresConfigInAdapterData()
 {
     SettingsModel model;
