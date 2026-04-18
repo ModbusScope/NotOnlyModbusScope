@@ -282,6 +282,63 @@ void TestAdapterSettings::addTabInitializesNameToConnectionId()
     QCOMPARE(form->values().value("name").toString(), QStringLiteral("Connections 3"));
 }
 
+void TestAdapterSettings::tabNameUsesNameFieldOnLoad()
+{
+    SettingsModel model;
+
+    QJsonObject nameProp;
+    nameProp["type"] = "string";
+    nameProp["title"] = "Connection Name";
+    QJsonObject itemProps;
+    itemProps["name"] = nameProp;
+
+    model.updateAdapterFromDescribe("testAdapter", makeDescribeResult("connections", "array", itemProps));
+
+    QJsonObject conn0;
+    conn0["name"] = "My Conn";
+    QJsonObject config;
+    config["connections"] = QJsonArray{ conn0 };
+    model.setAdapterCurrentConfig("testAdapter", config);
+
+    AdapterSettings w(&model, "testAdapter", "connections");
+
+    auto* tabs = w.findChild<AddableTabWidget*>();
+    QVERIFY(tabs != nullptr);
+    QCOMPARE(tabs->tabText(0), QStringLiteral("My Conn"));
+}
+
+void TestAdapterSettings::tabNameUpdatesWhenNameFieldChanges()
+{
+    SettingsModel model;
+
+    QJsonObject nameProp;
+    nameProp["type"] = "string";
+    nameProp["title"] = "Connection Name";
+    QJsonObject itemProps;
+    itemProps["name"] = nameProp;
+
+    model.updateAdapterFromDescribe("testAdapter", makeDescribeResult("connections", "array", itemProps));
+
+    QJsonObject conn0;
+    conn0["name"] = "Original";
+    QJsonObject config;
+    config["connections"] = QJsonArray{ conn0 };
+    model.setAdapterCurrentConfig("testAdapter", config);
+
+    AdapterSettings w(&model, "testAdapter", "connections");
+
+    auto* tabs = w.findChild<AddableTabWidget*>();
+    QVERIFY(tabs != nullptr);
+    auto* form = qobject_cast<SchemaFormWidget*>(tabs->tabContent(0));
+    QVERIFY(form != nullptr);
+    auto* edit = form->findChild<QLineEdit*>();
+    QVERIFY(edit != nullptr);
+
+    edit->setText("Renamed");
+
+    QCOMPARE(tabs->tabText(0), QStringLiteral("Renamed"));
+}
+
 void TestAdapterSettings::acceptValuesStoresConfigInAdapterData()
 {
     SettingsModel model;

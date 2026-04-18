@@ -19,6 +19,8 @@ private slots:
     void addTabUsesPropertyDefaults();
     void addTabUsesNextIndexForId();
     void addTabInitializesNameToConnectionId();
+    void tabNameUsesNameFieldOnLoad();
+    void tabNameUpdatesWhenNameFieldChanges();
     void acceptValuesStoresConfigInAdapterData();
 };
 

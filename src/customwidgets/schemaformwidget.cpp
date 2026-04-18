@@ -75,6 +75,7 @@ void SchemaFormWidget::setSchema(const QJsonObject& schema, const QJsonObject& v
 
         QString label = propSchema.value("title").toString(key);
         QWidget* widget = createWidgetForProperty(propSchema, currentValue);
+        wireFieldChanged(key, widget);
         _fields.append({ key, widget });
         _pFormLayout->addRow(label + ":", widget);
     }
@@ -90,6 +91,7 @@ void SchemaFormWidget::setSchema(const QJsonObject& schema, const QJsonObject& v
         QJsonObject propSchema = thenProps.value(key).toObject();
         QString label = propSchema.value("title").toString(key);
         QWidget* widget = createWidgetForProperty(propSchema, values.value(key));
+        wireFieldChanged(key, widget);
         _fields.append({ key, widget });
         _pFormLayout->addRow(label + ":", widget);
     }
@@ -100,6 +102,7 @@ void SchemaFormWidget::setSchema(const QJsonObject& schema, const QJsonObject& v
         QJsonObject propSchema = elseProps.value(key).toObject();
         QString label = propSchema.value("title").toString(key);
         QWidget* widget = createWidgetForProperty(propSchema, values.value(key));
+        wireFieldChanged(key, widget);
         _fields.append({ key, widget });
         _pFormLayout->addRow(label + ":", widget);
     }
@@ -210,6 +213,16 @@ QWidget* SchemaFormWidget::createWidgetForProperty(const QJsonObject& propSchema
         edit->setText(value.toString());
         return edit;
     }
+}
+
+void SchemaFormWidget::wireFieldChanged(const QString& key, QWidget* widget)
+{
+    auto* edit = qobject_cast<QLineEdit*>(widget);
+    if (edit == nullptr)
+    {
+        return;
+    }
+    connect(edit, &QLineEdit::textChanged, this, [this, key](const QString& text) { emit fieldChanged(key, text); });
 }
 
 bool SchemaFormWidget::parseConditional(const QJsonObject& schema)

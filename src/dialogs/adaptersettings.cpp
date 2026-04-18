@@ -53,8 +53,10 @@ void AdapterSettings::buildSection(const QJsonObject& propSchema, const QJsonVal
         {
             auto* form = new SchemaFormWidget(_pItemTabs);
             form->setSchema(_itemSchema, itemsArray.at(i).toObject());
+            connectTabNameTracking(form);
             pages.append(form);
-            names.append(formatTabName(i + 1));
+            const QString itemName = itemsArray.at(i).toObject().value("name").toString();
+            names.append(itemName.isEmpty() ? formatTabName(i + 1) : itemName);
         }
 
         if (!pages.isEmpty())
@@ -86,6 +88,16 @@ QString AdapterSettings::formatTabName(int index) const
     return QString("%1 %2").arg(_propertyKey[0].toUpper() + _propertyKey.mid(1)).arg(index);
 }
 
+void AdapterSettings::connectTabNameTracking(SchemaFormWidget* form)
+{
+    connect(form, &SchemaFormWidget::fieldChanged, this, [this, form](const QString& key, const QString& value) {
+        if (key == "name")
+        {
+            _pItemTabs->setTabName(_pItemTabs->indexOf(form), value);
+        }
+    });
+}
+
 void AdapterSettings::addItemTab()
 {
     auto* form = new SchemaFormWidget(_pItemTabs);
@@ -111,7 +123,9 @@ void AdapterSettings::addItemTab()
     }
 
     form->setSchema(_itemSchema, defaultValues);
-    const QString name = formatTabName(_nextItemTabIndex);
+    connectTabNameTracking(form);
+    const QString tabName = defaultValues.value("name").toString();
+    const QString name = tabName.isEmpty() ? formatTabName(_nextItemTabIndex) : tabName;
     _nextItemTabIndex++;
     _pItemTabs->addNewTab(name, form);
 }

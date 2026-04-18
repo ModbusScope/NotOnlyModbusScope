@@ -501,4 +501,28 @@ void TestSchemaFormWidget::conditionalWithoutIfRequiredShowsCorrectFields()
     QVERIFY(!result.contains("baudrate"));
 }
 
+void TestSchemaFormWidget::fieldChangedEmittedOnStringEdit()
+{
+    QJsonObject propSchema;
+    propSchema["type"] = "string";
+
+    SchemaFormWidget w;
+    w.setSchema(makeObjectSchema("host", propSchema), QJsonObject{ { "host", "original" } });
+
+    QString emittedKey;
+    QString emittedValue;
+    connect(&w, &SchemaFormWidget::fieldChanged,
+            [&emittedKey, &emittedValue](const QString& key, const QString& value) {
+                emittedKey = key;
+                emittedValue = value;
+            });
+
+    auto* edit = w.findChild<QLineEdit*>();
+    QVERIFY(edit != nullptr);
+    edit->setText("updated");
+
+    QCOMPARE(emittedKey, QStringLiteral("host"));
+    QCOMPARE(emittedValue, QStringLiteral("updated"));
+}
+
 QTEST_MAIN(TestSchemaFormWidget)
