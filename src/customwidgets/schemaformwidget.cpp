@@ -223,19 +223,24 @@ bool SchemaFormWidget::parseConditional(const QJsonObject& schema)
         return false;
     }
 
+    const QJsonObject ifProperties = ifObj.value("properties").toObject();
+
+    QString triggerKey;
     const QJsonArray required = ifObj.value("required").toArray();
-    if (required.size() != 1)
+    if (required.size() == 1)
     {
-        return false;
+        triggerKey = required.at(0).toString();
+    }
+    else if (ifProperties.size() == 1)
+    {
+        triggerKey = ifProperties.constBegin().key();
     }
 
-    const QString triggerKey = required.at(0).toString();
     if (triggerKey.isEmpty())
     {
         return false;
     }
 
-    const QJsonObject ifProperties = ifObj.value("properties").toObject();
     const QJsonObject constObj = ifProperties.value(triggerKey).toObject();
     if (!constObj.contains("const"))
     {

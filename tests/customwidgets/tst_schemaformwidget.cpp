@@ -96,6 +96,23 @@ QJsonObject makeConditionalSchema()
     return schema;
 }
 
+/*!
+ * \brief Same as makeConditionalSchema() but without a \c required array in the \c if block.
+ *
+ * This matches the real adapter schema format where the trigger key is inferred
+ * from the single property in \c if.properties rather than from \c if.required.
+ */
+QJsonObject makeConditionalSchemaNoIfRequired()
+{
+    QJsonObject schema = makeConditionalSchema();
+
+    QJsonObject ifObj = schema["if"].toObject();
+    ifObj.remove("required");
+    schema["if"] = ifObj;
+
+    return schema;
+}
+
 } // namespace
 
 void TestSchemaFormWidget::emptySchemaCreatesEmptyForm()
@@ -462,6 +479,22 @@ void TestSchemaFormWidget::integerEnumMissingValueNoSchemaDefaultUsesFirstItem()
     QVERIFY(combo != nullptr);
     QCOMPARE(combo->currentIndex(), 0);
     QCOMPARE(w.values()["baudrate"].toInt(), 1200);
+}
+
+void TestSchemaFormWidget::conditionalWithoutIfRequiredShowsCorrectFields()
+{
+    SchemaFormWidget w;
+    QJsonObject values;
+    values["type"] = "tcp";
+    values["ip"] = "192.168.1.1";
+    values["port"] = 502;
+    w.setSchema(makeConditionalSchemaNoIfRequired(), values);
+
+    const QJsonObject result = w.values();
+    QVERIFY(result.contains("ip"));
+    QVERIFY(result.contains("port"));
+    QVERIFY(!result.contains("portName"));
+    QVERIFY(!result.contains("baudrate"));
 }
 
 QTEST_MAIN(TestSchemaFormWidget)

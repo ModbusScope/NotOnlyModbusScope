@@ -29,6 +29,7 @@ private slots:
     void integerEnumMissingValueUsesSchemaDefault();
     void stringEnumMissingValueUsesSchemaDefault();
     void integerEnumMissingValueNoSchemaDefaultUsesFirstItem();
+    void conditionalWithoutIfRequiredShowsCorrectFields();
 };
 
 #endif // TST_SCHEMAFORMWIDGET_H
