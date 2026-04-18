@@ -93,7 +93,11 @@ void AdapterSettings::connectTabNameTracking(SchemaFormWidget* form)
     connect(form, &SchemaFormWidget::fieldChanged, this, [this, form](const QString& key, const QString& value) {
         if (key == "name")
         {
-            _pItemTabs->setTabName(_pItemTabs->indexOf(form), value);
+            const int tabIndex = _pItemTabs->indexOf(form);
+            if (tabIndex >= 0)
+            {
+                _pItemTabs->setTabName(tabIndex, value.isEmpty() ? formatTabName(tabIndex + 1) : value);
+            }
         }
     });
 }
