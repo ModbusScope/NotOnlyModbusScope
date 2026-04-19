@@ -85,7 +85,11 @@ QString AdapterSettings::formatTabName(int index) const
     {
         return QString("Item %1").arg(index);
     }
-    QString label = _propertyKey.endsWith('s') ? _propertyKey.chopped(1) : _propertyKey;
+    QString label = (_propertyKey.length() > 1 && _propertyKey.endsWith('s')) ? _propertyKey.chopped(1) : _propertyKey;
+    if (label.isEmpty())
+    {
+        return QString("Item %1").arg(index);
+    }
     return QString("%1 %2").arg(label[0].toUpper() + label.mid(1)).arg(index);
 }
 
