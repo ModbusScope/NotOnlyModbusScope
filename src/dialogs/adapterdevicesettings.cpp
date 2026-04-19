@@ -168,9 +168,12 @@ void AdapterDeviceSettings::acceptValues()
         devicesByAdapter[tab->adapterId()].append(tabValues);
 
         int deviceId = tabValues.value("id").toInt(-1);
-        if (deviceId >= 0 && _pSettingsModel->deviceList().contains(static_cast<deviceId_t>(deviceId)))
+        if (deviceId >= 0)
         {
-            _pSettingsModel->deviceSettings(static_cast<deviceId_t>(deviceId))->setName(tab->deviceName());
+            const deviceId_t devId = static_cast<deviceId_t>(deviceId);
+            _pSettingsModel->addDevice(devId);
+            _pSettingsModel->deviceSettings(devId)->setAdapterId(tab->adapterId());
+            _pSettingsModel->deviceSettings(devId)->setName(tab->deviceName());
         }
     }
 

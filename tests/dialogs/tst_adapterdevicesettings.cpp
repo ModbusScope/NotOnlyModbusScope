@@ -306,4 +306,55 @@ void TestAdapterDeviceSettings::deviceIdPreservedWhenAdapterChanged()
     QCOMPARE(tab->adapterId(), QStringLiteral("adapterB"));
 }
 
+void TestAdapterDeviceSettings::deviceNamePersistedAfterAcceptAndReopen()
+{
+    SettingsModel model;
+
+    QJsonObject dev1;
+    dev1["id"] = 1;
+    QJsonObject dev2;
+    dev2["id"] = 2;
+    setupAdapter(model, "adapterA", QJsonArray{ dev1, dev2 });
+
+    // Device 2 is in the adapter config but NOT in the SettingsModel device list,
+    // simulating the case where the project file's devices section omitted it.
+    QVERIFY(!model.hasDevice(2));
+
+    // First dialog open: user types a name for device 2.
+    {
+        AdapterDeviceSettings w(&model);
+
+        auto* tabs = w.findChild<AddableTabWidget*>();
+        QVERIFY(tabs != nullptr);
+
+        auto* tab2 = qobject_cast<DeviceConfigTab*>(tabs->tabContent(1));
+        QVERIFY(tab2 != nullptr);
+
+        auto* nameEdit = tab2->findChild<QLineEdit*>(QString(), Qt::FindDirectChildrenOnly);
+        QVERIFY(nameEdit != nullptr);
+        nameEdit->setText("Pump 2");
+
+        w.acceptValues();
+    }
+
+    // After accepting, device 2 must be registered in the model with the correct name.
+    QVERIFY(model.hasDevice(2));
+    QCOMPARE(model.deviceSettings(2)->name(), QStringLiteral("Pump 2"));
+
+    // Second dialog open (reopen): device 2 name must not be reset to empty.
+    {
+        AdapterDeviceSettings w2(&model);
+
+        auto* tabs = w2.findChild<AddableTabWidget*>();
+        QVERIFY(tabs != nullptr);
+
+        auto* tab2 = qobject_cast<DeviceConfigTab*>(tabs->tabContent(1));
+        QVERIFY(tab2 != nullptr);
+
+        auto* nameEdit = tab2->findChild<QLineEdit*>(QString(), Qt::FindDirectChildrenOnly);
+        QVERIFY(nameEdit != nullptr);
+        QCOMPARE(nameEdit->text(), QStringLiteral("Pump 2"));
+    }
+}
+
 QTEST_MAIN(TestAdapterDeviceSettings)
