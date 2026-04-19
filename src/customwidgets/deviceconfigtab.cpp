@@ -138,3 +138,8 @@ QString DeviceConfigTab::deviceName() const
 {
     return _pNameEdit->text();
 }
+
+int DeviceConfigTab::deviceId() const
+{
+    return _deviceId;
+}

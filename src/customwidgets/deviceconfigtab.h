@@ -46,6 +46,12 @@ public:
      */
     QString deviceName() const;
 
+    /*!
+     * \brief Return the device ID assigned to this tab, or -1 if none.
+     * \return Device ID as int.
+     */
+    int deviceId() const;
+
 signals:
     //! Emitted when the device name field changes.
     void nameChanged(const QString& name);
