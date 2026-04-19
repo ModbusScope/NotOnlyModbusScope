@@ -30,6 +30,7 @@ public:
 
 private slots:
     void handleAddTab();
+    void handleCloseTab(QWidget* widget);
 
 private:
     QString constructTabName(const QJsonObject& deviceValues, int tabIndex) const;

@@ -39,6 +39,7 @@ AdapterDeviceSettings::AdapterDeviceSettings(SettingsModel* pSettingsModel, QWid
     layout->addWidget(_pDeviceTabs, 1);
 
     connect(_pDeviceTabs, &AddableTabWidget::addTabRequested, this, &AdapterDeviceSettings::handleAddTab);
+    connect(_pDeviceTabs, &AddableTabWidget::tabClosed, this, &AdapterDeviceSettings::handleCloseTab);
 
     // Load devices from all adapters with a schema
     QList<QWidget*> pages;
@@ -105,6 +106,15 @@ void AdapterDeviceSettings::handleAddTab()
     auto* tab = new DeviceConfigTab(_pSettingsModel, defaultAdapterId, defaultValues, _pDeviceTabs);
     connectTabNameTracking(tab);
     _pDeviceTabs->addNewTab(constructTabName(defaultValues, tabIndex), tab);
+}
+
+void AdapterDeviceSettings::handleCloseTab(QWidget* widget)
+{
+    auto* tab = qobject_cast<DeviceConfigTab*>(widget);
+    if (tab && tab->deviceId() >= 0)
+    {
+        _pSettingsModel->removeDevice(static_cast<deviceId_t>(tab->deviceId()));
+    }
 }
 
 QString AdapterDeviceSettings::constructTabName(DeviceConfigTab* tab) const
