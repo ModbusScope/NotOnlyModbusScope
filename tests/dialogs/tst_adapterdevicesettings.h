@@ -22,6 +22,10 @@ private slots:
     void deviceIdPreservedWhenAdapterChanged();
     void deviceNamePersistedAfterAcceptAndReopen();
     void addTabDoesNotReuseIdFromAdapterConfig();
+    void closeTabRemovesDeviceFromModel();
+    void nameChangeUpdatesModelImmediately();
+    void adapterChangeUpdatesModelImmediately();
+    void multipleAdaptersWithDevices();
 
 private:
     //! Populate \a model with an adapter that has a minimal device schema and

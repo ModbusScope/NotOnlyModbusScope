@@ -58,6 +58,7 @@ signals:
 
 private slots:
     void onAdapterChanged(int index);
+    void onNameChanged(const QString& name);
 
 private:
     void rebuildSchemaForm(const QString& adapterId, const QJsonObject& deviceValues);

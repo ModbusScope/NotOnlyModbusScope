@@ -66,7 +66,7 @@ DeviceConfigTab::DeviceConfigTab(SettingsModel* pSettingsModel,
         _pAdapterCombo->setCurrentIndex(idx);
     }
 
-    connect(_pNameEdit, &QLineEdit::textChanged, this, &DeviceConfigTab::nameChanged);
+    connect(_pNameEdit, &QLineEdit::textChanged, this, &DeviceConfigTab::onNameChanged);
     connect(_pAdapterCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
             &DeviceConfigTab::onAdapterChanged);
 
@@ -97,7 +97,21 @@ void DeviceConfigTab::onAdapterChanged(int index)
     }
     defaultValues["id"] = currentId;
 
+    if (_deviceId >= 0 && _pSettingsModel->hasDevice(static_cast<deviceId_t>(_deviceId)))
+    {
+        _pSettingsModel->deviceSettings(static_cast<deviceId_t>(_deviceId))->setAdapterId(newAdapterId);
+    }
+
     rebuildSchemaForm(newAdapterId, defaultValues);
+}
+
+void DeviceConfigTab::onNameChanged(const QString& name)
+{
+    if (_deviceId >= 0 && _pSettingsModel->hasDevice(static_cast<deviceId_t>(_deviceId)))
+    {
+        _pSettingsModel->deviceSettings(static_cast<deviceId_t>(_deviceId))->setName(name);
+    }
+    emit nameChanged(name);
 }
 
 void DeviceConfigTab::rebuildSchemaForm(const QString& adapterId, const QJsonObject& deviceValues)

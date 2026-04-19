@@ -1,7 +1,7 @@
 #ifndef ADAPTERDEVICESETTINGS_H
 #define ADAPTERDEVICESETTINGS_H
 
-#include <QJsonObject>
+#include <QStringList>
 #include <QWidget>
 
 class SettingsModel;
@@ -24,7 +24,7 @@ public:
     ~AdapterDeviceSettings() = default;
 
     /*!
-     * \brief Write the current form values back to each adapter's device configuration.
+     * \brief Write the per-adapter device JSON arrays back to each adapter's stored config.
      */
     void acceptValues();
 
@@ -33,7 +33,7 @@ private slots:
     void handleCloseTab(QWidget* widget);
 
 private:
-    QString constructTabName(const QJsonObject& deviceValues, int tabIndex) const;
+    QStringList validAdapterIds() const;
     QString constructTabName(DeviceConfigTab* tab) const;
     void connectTabNameTracking(DeviceConfigTab* tab);
 

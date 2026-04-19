@@ -136,7 +136,7 @@ void TestAdapterDeviceSettings::missingNameFallsBackToDeviceN()
     {
         return;
     }
-    QVERIFY(tabs->tabText(0).startsWith("Device "));
+    QVERIFY(tabs->tabText(0).startsWith("Device"));
 }
 
 void TestAdapterDeviceSettings::acceptValuesSavesToAdapterConfig()
@@ -387,6 +387,107 @@ void TestAdapterDeviceSettings::addTabDoesNotReuseIdFromAdapterConfig()
     QVERIFY(assignedId != 2);
     QCOMPARE(assignedId, 3);
     QVERIFY(model.hasDevice(static_cast<deviceId_t>(assignedId)));
+}
+
+void TestAdapterDeviceSettings::closeTabRemovesDeviceFromModel()
+{
+    SettingsModel model;
+
+    QJsonObject dev1;
+    dev1["id"] = 1;
+    QJsonObject dev2;
+    dev2["id"] = 2;
+    setupAdapter(model, "adapterA", QJsonArray{ dev1, dev2 });
+
+    AdapterDeviceSettings w(&model);
+
+    auto* tabs = w.findChild<AddableTabWidget*>();
+    QVERIFY(tabs != nullptr);
+    QVERIFY(model.hasDevice(1));
+    QVERIFY(model.hasDevice(2));
+
+    tabs->handleCloseTab(0);
+
+    QVERIFY(!model.hasDevice(1));
+    QVERIFY(model.hasDevice(2));
+}
+
+void TestAdapterDeviceSettings::nameChangeUpdatesModelImmediately()
+{
+    SettingsModel model;
+
+    QJsonObject dev;
+    dev["id"] = 1;
+    setupAdapter(model, "adapterA", QJsonArray{ dev });
+
+    AdapterDeviceSettings w(&model);
+
+    auto* tabs = w.findChild<AddableTabWidget*>();
+    QVERIFY(tabs != nullptr);
+
+    auto* tab = qobject_cast<DeviceConfigTab*>(tabs->tabContent(0));
+    QVERIFY(tab != nullptr);
+
+    auto* nameEdit = tab->findChild<QLineEdit*>(QString(), Qt::FindDirectChildrenOnly);
+    QVERIFY(nameEdit != nullptr);
+    nameEdit->setText("Live Name");
+
+    QCOMPARE(model.deviceSettings(1)->name(), QStringLiteral("Live Name"));
+}
+
+void TestAdapterDeviceSettings::adapterChangeUpdatesModelImmediately()
+{
+    SettingsModel model;
+    setupAdapter(model, "adapterA", QJsonArray());
+    setupAdapter(model, "adapterB", QJsonArray());
+
+    AdapterDeviceSettings w(&model);
+
+    auto* tabs = w.findChild<AddableTabWidget*>();
+    QVERIFY(tabs != nullptr);
+
+    emit tabs->addTabRequested();
+    auto* tab = qobject_cast<DeviceConfigTab*>(tabs->tabContent(0));
+    QVERIFY(tab != nullptr);
+
+    const int devId = tab->values().value("id").toInt(-1);
+    QVERIFY(devId >= 1);
+    QCOMPARE(model.deviceSettings(static_cast<deviceId_t>(devId))->adapterId(), QStringLiteral("adapterA"));
+
+    auto* adapterCombo = tab->findChild<QComboBox*>();
+    QVERIFY(adapterCombo != nullptr);
+    int adapterBIdx = adapterCombo->findData(QStringLiteral("adapterB"));
+    QVERIFY(adapterBIdx >= 0);
+    adapterCombo->setCurrentIndex(adapterBIdx);
+
+    QCOMPARE(model.deviceSettings(static_cast<deviceId_t>(devId))->adapterId(), QStringLiteral("adapterB"));
+}
+
+void TestAdapterDeviceSettings::multipleAdaptersWithDevices()
+{
+    SettingsModel model;
+
+    QJsonObject devA;
+    devA["id"] = 1;
+    QJsonObject devB;
+    devB["id"] = 2;
+    setupAdapter(model, "adapterA", QJsonArray{ devA });
+    setupAdapter(model, "adapterB", QJsonArray{ devB });
+
+    AdapterDeviceSettings w(&model);
+
+    auto* tabs = w.findChild<AddableTabWidget*>();
+    QVERIFY(tabs != nullptr);
+    QCOMPARE(tabs->count(), 2);
+
+    w.acceptValues();
+
+    const AdapterData* adapterA = model.adapterData("adapterA");
+    const AdapterData* adapterB = model.adapterData("adapterB");
+    QCOMPARE(adapterA->currentConfig().value("devices").toArray().size(), 1);
+    QCOMPARE(adapterB->currentConfig().value("devices").toArray().size(), 1);
+    QCOMPARE(adapterA->currentConfig().value("devices").toArray().at(0).toObject().value("id").toInt(), 1);
+    QCOMPARE(adapterB->currentConfig().value("devices").toArray().at(0).toObject().value("id").toInt(), 2);
 }
 
 QTEST_MAIN(TestAdapterDeviceSettings)
