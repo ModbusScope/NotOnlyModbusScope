@@ -357,4 +357,36 @@ void TestAdapterDeviceSettings::deviceNamePersistedAfterAcceptAndReopen()
     }
 }
 
+void TestAdapterDeviceSettings::addTabDoesNotReuseIdFromAdapterConfig()
+{
+    SettingsModel model;
+
+    // Use id=2: SettingsModel pre-populates device 1 (cFirstDeviceId), so the
+    // first free slot found by addNewDevice() would be 2 — colliding with this tab
+    // unless the constructor registers it first.
+    QJsonObject dev;
+    dev["id"] = 2;
+    setupAdapter(model, "adapterA", QJsonArray{ dev });
+
+    // Device 2 is in the adapter config but NOT registered in SettingsModel.
+    QVERIFY(!model.hasDevice(2));
+
+    AdapterDeviceSettings w(&model);
+
+    auto* tabs = w.findChild<AddableTabWidget*>();
+    QVERIFY(tabs != nullptr);
+    QCOMPARE(tabs->count(), 1);
+
+    emit tabs->addTabRequested();
+
+    QCOMPARE(tabs->count(), 2);
+    auto* tab = qobject_cast<DeviceConfigTab*>(tabs->tabContent(1));
+    QVERIFY(tab != nullptr);
+
+    const int assignedId = tab->values().value("id").toInt(-1);
+    QVERIFY(assignedId != 2);
+    QCOMPARE(assignedId, 3);
+    QVERIFY(model.hasDevice(static_cast<deviceId_t>(assignedId)));
+}
+
 QTEST_MAIN(TestAdapterDeviceSettings)

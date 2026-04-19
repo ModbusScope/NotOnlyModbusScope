@@ -52,6 +52,11 @@ AdapterDeviceSettings::AdapterDeviceSettings(SettingsModel* pSettingsModel, QWid
 
         for (const auto& device : devices)
         {
+            const int id = device.toObject().value("id").toInt(-1);
+            if (id >= 0)
+            {
+                pSettingsModel->addDevice(static_cast<deviceId_t>(id));
+            }
             auto* tab = new DeviceConfigTab(pSettingsModel, adapterId, device.toObject(), _pDeviceTabs);
             connectTabNameTracking(tab);
             pages.append(tab);
