@@ -136,6 +136,7 @@ void AdapterSettings::addItemTab()
             }
         }
         defaultValues["id"] = maxId + 1;
+        _nextItemTabIndex = maxId + 1;
     }
 
     const QJsonObject nameProp = properties.value("name").toObject();

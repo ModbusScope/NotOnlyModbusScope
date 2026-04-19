@@ -19,6 +19,7 @@ private slots:
     void addTabUsesPropertyDefaults();
     void addTabUsesNextIndexForId();
     void addTabAssignsMaxIdPlusOneForNonContiguousIds();
+    void addTabNameMatchesIdForNonContiguousIds();
     void addTabInitializesNameToConnectionId();
     void tabNameUsesNameFieldOnLoad();
     void tabNameUpdatesWhenNameFieldChanges();
