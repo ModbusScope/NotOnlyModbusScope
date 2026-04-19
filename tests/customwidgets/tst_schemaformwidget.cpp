@@ -9,6 +9,7 @@
 #include <QJsonObject>
 #include <QLabel>
 #include <QLineEdit>
+#include <QSignalSpy>
 #include <QSpinBox>
 #include <QTest>
 
@@ -509,20 +510,16 @@ void TestSchemaFormWidget::fieldChangedEmittedOnStringEdit()
     SchemaFormWidget w;
     w.setSchema(makeObjectSchema("host", propSchema), QJsonObject{ { "host", "original" } });
 
-    QString emittedKey;
-    QString emittedValue;
-    connect(&w, &SchemaFormWidget::fieldChanged,
-            [&emittedKey, &emittedValue](const QString& key, const QString& value) {
-                emittedKey = key;
-                emittedValue = value;
-            });
+    QSignalSpy spy(&w, &SchemaFormWidget::fieldChanged);
 
     auto* edit = w.findChild<QLineEdit*>();
     QVERIFY(edit != nullptr);
     edit->setText("updated");
 
-    QCOMPARE(emittedKey, QStringLiteral("host"));
-    QCOMPARE(emittedValue, QStringLiteral("updated"));
+    QCOMPARE(spy.count(), 1);
+    QList<QVariant> args = spy.takeFirst();
+    QCOMPARE(args.at(0).toString(), QStringLiteral("host"));
+    QCOMPARE(args.at(1).toString(), QStringLiteral("updated"));
 }
 
 QTEST_MAIN(TestSchemaFormWidget)
