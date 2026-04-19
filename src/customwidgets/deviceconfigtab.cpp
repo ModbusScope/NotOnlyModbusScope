@@ -105,7 +105,7 @@ void DeviceConfigTab::rebuildSchemaForm(const QString& adapterId, const QJsonObj
     if (_pSchemaForm)
     {
         _pLayout->removeWidget(_pSchemaForm);
-        delete _pSchemaForm;
+        _pSchemaForm->deleteLater();
         _pSchemaForm = nullptr;
     }
 
