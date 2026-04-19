@@ -122,7 +122,16 @@ void AdapterSettings::addItemTab()
     const QJsonObject idProp = properties.value("id").toObject();
     if (!idProp.isEmpty() && idProp.value("type").toString() == "integer")
     {
-        defaultValues["id"] = _nextItemTabIndex;
+        int maxId = 0;
+        for (int i = 0; i < _pItemTabs->count(); ++i)
+        {
+            auto* existingForm = qobject_cast<SchemaFormWidget*>(_pItemTabs->tabContent(i));
+            if (existingForm)
+            {
+                maxId = qMax(maxId, existingForm->values().value("id").toInt());
+            }
+        }
+        defaultValues["id"] = maxId + 1;
     }
 
     const QJsonObject nameProp = properties.value("name").toObject();
