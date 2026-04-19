@@ -135,7 +135,7 @@ QString AdapterDeviceSettings::constructTabName(DeviceConfigTab* tab) const
 
 void AdapterDeviceSettings::connectTabNameTracking(DeviceConfigTab* tab)
 {
-    connect(tab, &DeviceConfigTab::nameChanged, this,
+    connect(tab, &DeviceConfigTab::nameChanged, tab,
             [this, tab]() { _pDeviceTabs->setTabName(_pDeviceTabs->indexOf(tab), constructTabName(tab)); });
 }
 

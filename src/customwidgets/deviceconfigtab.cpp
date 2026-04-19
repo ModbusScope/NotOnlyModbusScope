@@ -17,14 +17,13 @@ DeviceConfigTab::DeviceConfigTab(SettingsModel* pSettingsModel,
                                  const QJsonObject& deviceValues,
                                  QWidget* parent)
     : QWidget(parent),
-      _pLayout(nullptr),
+      _pLayout(new QVBoxLayout(this)),
       _pNameEdit(new QLineEdit(this)),
       _pAdapterCombo(new QComboBox(this)),
       _pSchemaForm(nullptr),
       _pSettingsModel(pSettingsModel),
       _deviceId(deviceValues.value("id").toInt(-1))
 {
-    _pLayout = new QVBoxLayout(this);
     setLayout(_pLayout);
 
     auto* nameRow = new QHBoxLayout;
@@ -33,10 +32,9 @@ DeviceConfigTab::DeviceConfigTab(SettingsModel* pSettingsModel,
     nameRow->addStretch();
     _pLayout->addLayout(nameRow);
 
-    int deviceId = deviceValues.value("id").toInt(-1);
-    if (deviceId >= 0 && pSettingsModel->deviceList().contains(static_cast<deviceId_t>(deviceId)))
+    if (_deviceId >= 0 && pSettingsModel->hasDevice(static_cast<deviceId_t>(_deviceId)))
     {
-        _pNameEdit->setText(pSettingsModel->deviceSettings(static_cast<deviceId_t>(deviceId))->name());
+        _pNameEdit->setText(pSettingsModel->deviceSettings(static_cast<deviceId_t>(_deviceId))->name());
     }
 
     auto* adapterRow = new QHBoxLayout;
