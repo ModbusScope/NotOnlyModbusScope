@@ -335,6 +335,68 @@ void TestAdapterSettings::addTabNameMatchesIdForNonContiguousIds()
     QCOMPARE(tabs->tabText(2), QStringLiteral("Connection 4"));
 }
 
+void TestAdapterSettings::addTabNameMatchesIdForConsecutiveAddsWithNonContiguousStart()
+{
+    SettingsModel model;
+
+    QJsonObject idProp;
+    idProp["type"] = "integer";
+    idProp["title"] = "ID";
+    QJsonObject nameProp;
+    nameProp["type"] = "string";
+    nameProp["title"] = "Connection Name";
+    QJsonObject itemProps;
+    itemProps["id"] = idProp;
+    itemProps["name"] = nameProp;
+
+    QJsonObject describe = makeDescribeResult("connections", "array", itemProps);
+
+    QJsonObject defaultConn;
+    defaultConn["id"] = 1;
+    defaultConn["name"] = "Connection 1";
+    QJsonObject defaults;
+    defaults["connections"] = QJsonArray{ defaultConn };
+    describe["defaults"] = defaults;
+
+    model.updateAdapterFromDescribe("testAdapter", describe);
+
+    QJsonObject conn0;
+    conn0["id"] = 1;
+    conn0["name"] = "Connection 1";
+    QJsonObject conn1;
+    conn1["id"] = 3;
+    conn1["name"] = "Connection 3";
+    QJsonObject config;
+    config["connections"] = QJsonArray{ conn0, conn1 };
+    model.setAdapterCurrentConfig("testAdapter", config);
+
+    AdapterSettings w(&model, "testAdapter", "connections");
+
+    auto* tabs = w.findChild<AddableTabWidget*>();
+    QVERIFY(tabs != nullptr);
+    QCOMPARE(tabs->count(), 2);
+
+    // First add: maxId=3, so new id=4 and name="Connection 4"
+    emit tabs->addTabRequested();
+
+    QCOMPARE(tabs->count(), 3);
+    auto* form0 = qobject_cast<SchemaFormWidget*>(tabs->tabContent(2));
+    QVERIFY(form0 != nullptr);
+    QCOMPARE(form0->values().value("id").toInt(), 4);
+    QCOMPARE(form0->values().value("name").toString(), QStringLiteral("Connection 4"));
+    QCOMPARE(tabs->tabText(2), QStringLiteral("Connection 4"));
+
+    // Second add: maxId=4, so new id=5 and name="Connection 5"
+    emit tabs->addTabRequested();
+
+    QCOMPARE(tabs->count(), 4);
+    auto* form1 = qobject_cast<SchemaFormWidget*>(tabs->tabContent(3));
+    QVERIFY(form1 != nullptr);
+    QCOMPARE(form1->values().value("id").toInt(), 5);
+    QCOMPARE(form1->values().value("name").toString(), QStringLiteral("Connection 5"));
+    QCOMPARE(tabs->tabText(3), QStringLiteral("Connection 5"));
+}
+
 void TestAdapterSettings::addTabInitializesNameToConnectionId()
 {
     SettingsModel model;

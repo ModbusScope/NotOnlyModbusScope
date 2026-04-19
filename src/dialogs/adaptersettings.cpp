@@ -123,6 +123,8 @@ void AdapterSettings::addItemTab()
 
     const QJsonObject properties = _itemSchema.value("properties").toObject();
 
+    int nameIndex = _nextItemTabIndex;
+
     const QJsonObject idProp = properties.value("id").toObject();
     if (!idProp.isEmpty() && idProp.value("type").toString() == "integer")
     {
@@ -136,19 +138,19 @@ void AdapterSettings::addItemTab()
             }
         }
         defaultValues["id"] = maxId + 1;
-        _nextItemTabIndex = maxId + 1;
+        nameIndex = maxId + 1;
     }
 
     const QJsonObject nameProp = properties.value("name").toObject();
     if (!nameProp.isEmpty() && nameProp.value("type").toString() == "string")
     {
-        defaultValues["name"] = formatTabName(_nextItemTabIndex);
+        defaultValues["name"] = formatTabName(nameIndex);
     }
 
     form->setSchema(_itemSchema, defaultValues);
     connectTabNameTracking(form);
     const QString tabName = defaultValues.value("name").toString();
-    const QString name = tabName.isEmpty() ? formatTabName(_nextItemTabIndex) : tabName;
+    const QString name = tabName.isEmpty() ? formatTabName(nameIndex) : tabName;
     _nextItemTabIndex++;
     _pItemTabs->addNewTab(name, form);
 }

@@ -20,6 +20,7 @@ private slots:
     void addTabUsesNextIndexForId();
     void addTabAssignsMaxIdPlusOneForNonContiguousIds();
     void addTabNameMatchesIdForNonContiguousIds();
+    void addTabNameMatchesIdForConsecutiveAddsWithNonContiguousStart();
     void addTabInitializesNameToConnectionId();
     void tabNameUsesNameFieldOnLoad();
     void tabNameUpdatesWhenNameFieldChanges();
