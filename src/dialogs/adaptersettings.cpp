@@ -93,18 +93,22 @@ QString AdapterSettings::formatTabName(int index) const
     return QString("%1 %2").arg(label[0].toUpper() + label.mid(1)).arg(index);
 }
 
+void AdapterSettings::onSchemaFieldNameChanged(SchemaFormWidget* form, const QString& key, const QString& value)
+{
+    if (key == "name")
+    {
+        const int tabIndex = _pItemTabs->indexOf(form);
+        if (tabIndex >= 0)
+        {
+            _pItemTabs->setTabName(tabIndex, value.isEmpty() ? formatTabName(tabIndex + 1) : value);
+        }
+    }
+}
+
 void AdapterSettings::connectTabNameTracking(SchemaFormWidget* form)
 {
-    connect(form, &SchemaFormWidget::fieldChanged, this, [this, form](const QString& key, const QString& value) {
-        if (key == "name")
-        {
-            const int tabIndex = _pItemTabs->indexOf(form);
-            if (tabIndex >= 0)
-            {
-                _pItemTabs->setTabName(tabIndex, value.isEmpty() ? formatTabName(tabIndex + 1) : value);
-            }
-        }
-    });
+    connect(form, &SchemaFormWidget::fieldChanged, this,
+            [this, form](const QString& key, const QString& value) { onSchemaFieldNameChanged(form, key, value); });
 }
 
 void AdapterSettings::addItemTab()
