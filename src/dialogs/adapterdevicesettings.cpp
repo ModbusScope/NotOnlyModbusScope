@@ -107,10 +107,17 @@ void AdapterDeviceSettings::handleAddTab()
     _pDeviceTabs->addNewTab(constructTabName(defaultValues, tabIndex), tab);
 }
 
+QString AdapterDeviceSettings::constructTabName(DeviceConfigTab* tab) const
+{
+    int tabIndex = _pDeviceTabs->indexOf(tab) + 1;
+    return constructTabName(tab->values(), tabIndex);
+}
+
 void AdapterDeviceSettings::connectTabNameTracking(DeviceConfigTab* tab)
 {
-    connect(tab, &DeviceConfigTab::nameChanged, this,
-            [this, tab](const QString& name) { _pDeviceTabs->setTabName(_pDeviceTabs->indexOf(tab), name); });
+    connect(tab, &DeviceConfigTab::nameChanged, this, [this, tab](const QString& name) {
+        _pDeviceTabs->setTabName(_pDeviceTabs->indexOf(tab), name.isEmpty() ? constructTabName(tab) : name);
+    });
 }
 
 QString AdapterDeviceSettings::constructTabName(const QJsonObject& deviceValues, int tabIndex) const
