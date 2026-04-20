@@ -22,6 +22,7 @@ private slots:
     void deviceIdPreservedWhenAdapterChanged();
     void deviceNamePersistedAfterAcceptAndReopen();
     void addTabDoesNotReuseIdFromAdapterConfig();
+    void addTabWithGapAssignsNextAfterMax();
     void closeTabRemovesDeviceFromModel();
     void nameChangeUpdatesModelImmediately();
     void adapterChangeUpdatesModelImmediately();

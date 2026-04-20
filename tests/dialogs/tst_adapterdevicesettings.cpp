@@ -389,6 +389,36 @@ void TestAdapterDeviceSettings::addTabDoesNotReuseIdFromAdapterConfig()
     QVERIFY(model.hasDevice(static_cast<deviceId_t>(assignedId)));
 }
 
+void TestAdapterDeviceSettings::addTabWithGapAssignsNextAfterMax()
+{
+    SettingsModel model;
+
+    // Devices 1 and 3 are present — id 2 is a gap. Adding a new device should
+    // assign id 4 (max + 1), not 2 (gap fill), to avoid confusing tab ordering
+    // where a new "Device 2" tab appears after an existing "Device 3" tab.
+    QJsonObject dev1;
+    dev1["id"] = 1;
+    QJsonObject dev3;
+    dev3["id"] = 3;
+    setupAdapter(model, "adapterA", QJsonArray{ dev1, dev3 });
+
+    AdapterDeviceSettings w(&model);
+
+    auto* tabs = w.findChild<AddableTabWidget*>();
+    QVERIFY(tabs != nullptr);
+    QCOMPARE(tabs->count(), 2);
+
+    emit tabs->addTabRequested();
+
+    QCOMPARE(tabs->count(), 3);
+    auto* tab = qobject_cast<DeviceConfigTab*>(tabs->tabContent(2));
+    QVERIFY(tab != nullptr);
+
+    const int assignedId = tab->values().value("id").toInt(-1);
+    QCOMPARE(assignedId, 4);
+    QVERIFY(model.hasDevice(static_cast<deviceId_t>(assignedId)));
+}
+
 void TestAdapterDeviceSettings::closeTabRemovesDeviceFromModel()
 {
     SettingsModel model;
