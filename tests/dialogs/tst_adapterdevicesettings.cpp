@@ -520,4 +520,116 @@ void TestAdapterDeviceSettings::multipleAdaptersWithDevices()
     QCOMPARE(adapterB->currentConfig().value("devices").toArray().at(0).toObject().value("id").toInt(), 2);
 }
 
+void TestAdapterDeviceSettings::addTabAfterIdEditDoesNotDuplicate()
+{
+    SettingsModel model;
+
+    QJsonObject dev1;
+    dev1["id"] = 1;
+    setupAdapter(model, "adapterA", QJsonArray{ dev1 });
+
+    AdapterDeviceSettings w(&model);
+
+    auto* tabs = w.findChild<AddableTabWidget*>();
+    QVERIFY(tabs != nullptr);
+    QCOMPARE(tabs->count(), 1);
+
+    // Add device → gets ID 2
+    emit tabs->addTabRequested();
+    QCOMPARE(tabs->count(), 2);
+
+    auto* tab2 = qobject_cast<DeviceConfigTab*>(tabs->tabContent(1));
+    QVERIFY(tab2 != nullptr);
+    QCOMPARE(tab2->values().value("id").toInt(-1), 2);
+
+    // User manually edits device 2's ID spinbox to 3
+    auto* spin = tab2->findChild<QSpinBox*>();
+    QVERIFY(spin != nullptr);
+    spin->setValue(3);
+    QCOMPARE(tab2->values().value("id").toInt(-1), 3);
+
+    // Add another device — must get ID 4, not 3 (which is now shown in an open tab)
+    emit tabs->addTabRequested();
+    QCOMPARE(tabs->count(), 3);
+
+    auto* tab3 = qobject_cast<DeviceConfigTab*>(tabs->tabContent(2));
+    QVERIFY(tab3 != nullptr);
+    const int assignedId = tab3->values().value("id").toInt(-1);
+    QCOMPARE(assignedId, 4);
+}
+
+void TestAdapterDeviceSettings::acceptValuesClearsDevicesForEmptiedAdapter()
+{
+    SettingsModel model;
+
+    QJsonObject devA;
+    devA["id"] = 1;
+    QJsonObject devB;
+    devB["id"] = 3;
+    setupAdapter(model, "adapterA", QJsonArray{ devA });
+    setupAdapter(model, "adapterB", QJsonArray{ devB });
+
+    AdapterDeviceSettings w(&model);
+
+    auto* tabs = w.findChild<AddableTabWidget*>();
+    QVERIFY(tabs != nullptr);
+    QCOMPARE(tabs->count(), 2);
+
+    // Close adapter B's only device tab (tab index 1 — adapters sorted alphabetically)
+    tabs->handleCloseTab(1);
+    QCOMPARE(tabs->count(), 1);
+
+    w.acceptValues();
+
+    // Adapter B's config must have an empty devices array, not the stale {device 3}
+    const AdapterData* adapterB = model.adapterData("adapterB");
+    QVERIFY(adapterB->hasStoredConfig());
+    QCOMPARE(adapterB->currentConfig().value("devices").toArray().size(), 0);
+
+    // Re-open: device 3 must NOT reappear
+    AdapterDeviceSettings w2(&model);
+    auto* tabs2 = w2.findChild<AddableTabWidget*>();
+    QVERIFY(tabs2 != nullptr);
+    QCOMPARE(tabs2->count(), 1);
+}
+
+void TestAdapterDeviceSettings::cancelAndReopenDoesNotLeakDeviceIds()
+{
+    SettingsModel model;
+
+    QJsonObject dev1;
+    dev1["id"] = 1;
+    setupAdapter(model, "adapterA", QJsonArray{ dev1 });
+
+    // First session: add a device then destroy without accepting (simulate cancel)
+    {
+        AdapterDeviceSettings w(&model);
+
+        auto* tabs = w.findChild<AddableTabWidget*>();
+        QVERIFY(tabs != nullptr);
+        QCOMPARE(tabs->count(), 1);
+
+        emit tabs->addTabRequested(); // addNewDevice() → ID 2; leaks into model on cancel
+        QCOMPARE(tabs->count(), 2);
+        // w destroyed without acceptValues() — leaked device 2 remains in model
+    }
+
+    // Second session: config still has only device 1
+    {
+        AdapterDeviceSettings w2(&model);
+
+        auto* tabs = w2.findChild<AddableTabWidget*>();
+        QVERIFY(tabs != nullptr);
+        QCOMPARE(tabs->count(), 1);
+
+        emit tabs->addTabRequested();
+        QCOMPARE(tabs->count(), 2);
+
+        auto* newTab = qobject_cast<DeviceConfigTab*>(tabs->tabContent(1));
+        QVERIFY(newTab != nullptr);
+        const int assignedId = newTab->values().value("id").toInt(-1);
+        QCOMPARE(assignedId, 2); // must be 2, not 3 or higher
+    }
+}
+
 QTEST_MAIN(TestAdapterDeviceSettings)

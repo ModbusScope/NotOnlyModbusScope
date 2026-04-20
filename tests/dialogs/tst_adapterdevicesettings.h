@@ -27,6 +27,9 @@ private slots:
     void nameChangeUpdatesModelImmediately();
     void adapterChangeUpdatesModelImmediately();
     void multipleAdaptersWithDevices();
+    void cancelAndReopenDoesNotLeakDeviceIds();
+    void addTabAfterIdEditDoesNotDuplicate();
+    void acceptValuesClearsDevicesForEmptiedAdapter();
 
 private:
     //! Populate \a model with an adapter that has a minimal device schema and

@@ -3,11 +3,13 @@
 #include "customwidgets/addabletabwidget.h"
 #include "customwidgets/deviceconfigtab.h"
 #include "models/adapterdata.h"
+#include "models/device.h"
 #include "models/settingsmodel.h"
 
 #include <QJsonArray>
 #include <QLabel>
 #include <QMap>
+#include <QSet>
 #include <QVBoxLayout>
 
 AdapterDeviceSettings::AdapterDeviceSettings(SettingsModel* pSettingsModel, QWidget* parent)
@@ -29,6 +31,28 @@ AdapterDeviceSettings::AdapterDeviceSettings(SettingsModel* pSettingsModel, QWid
 
     connect(_pDeviceTabs, &AddableTabWidget::addTabRequested, this, &AdapterDeviceSettings::handleAddTab);
     connect(_pDeviceTabs, &AddableTabWidget::tabClosed, this, &AdapterDeviceSettings::handleCloseTab);
+
+    QSet<deviceId_t> configDeviceIds;
+    for (const auto& adapterId : adapterIds)
+    {
+        const QJsonArray devices = pSettingsModel->adapterData(adapterId)->effectiveConfig().value("devices").toArray();
+        for (const auto& device : devices)
+        {
+            const int id = device.toObject().value("id").toInt(-1);
+            if (id >= 0)
+            {
+                configDeviceIds.insert(static_cast<deviceId_t>(id));
+            }
+        }
+    }
+    const QList<deviceId_t> modelDeviceIds = pSettingsModel->deviceList();
+    for (const deviceId_t devId : modelDeviceIds)
+    {
+        if (!configDeviceIds.contains(devId))
+        {
+            pSettingsModel->removeDevice(devId);
+        }
+    }
 
     QList<QWidget*> pages;
     QStringList names;
@@ -81,7 +105,26 @@ void AdapterDeviceSettings::handleAddTab()
         defaultValues = defaultDevices.first().toObject();
     }
 
-    deviceId_t newId = _pSettingsModel->addNewDevice();
+    deviceId_t maxId = 0;
+    const QList<deviceId_t> modelIds = _pSettingsModel->deviceList();
+    if (!modelIds.isEmpty())
+    {
+        maxId = modelIds.last();
+    }
+    for (int i = 0; i < _pDeviceTabs->count(); ++i)
+    {
+        auto* tab = qobject_cast<DeviceConfigTab*>(_pDeviceTabs->tabContent(i));
+        if (tab)
+        {
+            const int id = tab->values().value("id").toInt(-1);
+            if (id >= 0)
+            {
+                maxId = qMax(maxId, static_cast<deviceId_t>(id));
+            }
+        }
+    }
+    const deviceId_t newId = (maxId > 0) ? maxId + 1 : Device::cFirstDeviceId;
+    _pSettingsModel->addDevice(newId);
     _pSettingsModel->deviceSettings(newId)->setAdapterId(defaultAdapterId);
     defaultValues["id"] = static_cast<int>(newId);
 
@@ -156,10 +199,11 @@ void AdapterDeviceSettings::acceptValues()
         }
     }
 
-    for (auto it = devicesByAdapter.cbegin(); it != devicesByAdapter.cend(); ++it)
+    const QStringList allAdapterIds = validAdapterIds();
+    for (const auto& adapterId : allAdapterIds)
     {
-        QJsonObject config = _pSettingsModel->adapterData(it.key())->effectiveConfig();
-        config["devices"] = it.value();
-        _pSettingsModel->setAdapterCurrentConfig(it.key(), config);
+        QJsonObject config = _pSettingsModel->adapterData(adapterId)->effectiveConfig();
+        config["devices"] = devicesByAdapter.value(adapterId);
+        _pSettingsModel->setAdapterCurrentConfig(adapterId, config);
     }
 }
