@@ -17,14 +17,13 @@ DeviceConfigTab::DeviceConfigTab(SettingsModel* pSettingsModel,
                                  const QJsonObject& deviceValues,
                                  QWidget* parent)
     : QWidget(parent),
-      _pLayout(nullptr),
+      _pLayout(new QVBoxLayout),
       _pNameEdit(new QLineEdit(this)),
       _pAdapterCombo(new QComboBox(this)),
       _pSchemaForm(nullptr),
       _pSettingsModel(pSettingsModel),
       _deviceId(deviceValues.value("id").toInt(-1))
 {
-    _pLayout = new QVBoxLayout(this);
     setLayout(_pLayout);
 
     auto* nameRow = new QHBoxLayout;
@@ -33,10 +32,9 @@ DeviceConfigTab::DeviceConfigTab(SettingsModel* pSettingsModel,
     nameRow->addStretch();
     _pLayout->addLayout(nameRow);
 
-    int deviceId = deviceValues.value("id").toInt(-1);
-    if (deviceId >= 0 && pSettingsModel->deviceList().contains(static_cast<deviceId_t>(deviceId)))
+    if (_deviceId >= 0 && pSettingsModel->hasDevice(static_cast<deviceId_t>(_deviceId)))
     {
-        _pNameEdit->setText(pSettingsModel->deviceSettings(static_cast<deviceId_t>(deviceId))->name());
+        _pNameEdit->setText(pSettingsModel->deviceSettings(static_cast<deviceId_t>(_deviceId))->name());
     }
 
     auto* adapterRow = new QHBoxLayout;
@@ -66,6 +64,7 @@ DeviceConfigTab::DeviceConfigTab(SettingsModel* pSettingsModel,
         _pAdapterCombo->setCurrentIndex(idx);
     }
 
+    connect(_pNameEdit, &QLineEdit::textChanged, this, &DeviceConfigTab::onNameChanged);
     connect(_pAdapterCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
             &DeviceConfigTab::onAdapterChanged);
 
@@ -86,17 +85,25 @@ void DeviceConfigTab::onAdapterChanged(int index)
         defaultValues = defaultDevices.first().toObject();
     }
 
-    // Preserve the existing device id so that switching adapters does not overwrite
-    // the unique id assigned when the tab was created. Fall back to _deviceId when
-    // the id field is hidden in the schema form and not returned by values().
-    int currentId = _pSchemaForm ? _pSchemaForm->values().value("id").toInt(-1) : -1;
-    if (currentId < 0)
-    {
-        currentId = _deviceId;
-    }
+    const int currentId = deviceId();
     defaultValues["id"] = currentId;
 
+    if (currentId >= 0 && _pSettingsModel->hasDevice(static_cast<deviceId_t>(currentId)))
+    {
+        _pSettingsModel->deviceSettings(static_cast<deviceId_t>(currentId))->setAdapterId(newAdapterId);
+    }
+
     rebuildSchemaForm(newAdapterId, defaultValues);
+}
+
+void DeviceConfigTab::onNameChanged(const QString& name)
+{
+    const int id = deviceId();
+    if (id >= 0 && _pSettingsModel->hasDevice(static_cast<deviceId_t>(id)))
+    {
+        _pSettingsModel->deviceSettings(static_cast<deviceId_t>(id))->setName(name);
+    }
+    emit nameChanged(name);
 }
 
 void DeviceConfigTab::rebuildSchemaForm(const QString& adapterId, const QJsonObject& deviceValues)
@@ -104,7 +111,7 @@ void DeviceConfigTab::rebuildSchemaForm(const QString& adapterId, const QJsonObj
     if (_pSchemaForm)
     {
         _pLayout->removeWidget(_pSchemaForm);
-        delete _pSchemaForm;
+        _pSchemaForm->deleteLater();
         _pSchemaForm = nullptr;
     }
 
@@ -112,10 +119,18 @@ void DeviceConfigTab::rebuildSchemaForm(const QString& adapterId, const QJsonObj
     QJsonObject devicesSchema = pAdapter->schema().value("properties").toObject().value("devices").toObject();
     QJsonObject itemSchema = devicesSchema.value("items").toObject();
 
+    // Make the "id" field read-only since we don't support changing it after creation, and it must be present for
+    // existing devices. TODO: In the future we may want to allow editing it for new devices that haven't been saved
+    // yet, but that would require some additional handling to avoid conflicts with existing IDs.
+    QJsonObject propsObj = itemSchema.value("properties").toObject();
+    QJsonObject idProp = propsObj.value("id").toObject();
+    idProp["readOnly"] = true;
+    propsObj["id"] = idProp;
+    itemSchema["properties"] = propsObj;
+
     _pSchemaForm = new SchemaFormWidget(this);
     _pSchemaForm->setSchema(itemSchema, deviceValues);
 
-    // Insert before the trailing stretch (last item)
     _pLayout->insertWidget(_pLayout->count() - 1, _pSchemaForm);
 }
 
@@ -136,4 +151,17 @@ QString DeviceConfigTab::adapterId() const
 QString DeviceConfigTab::deviceName() const
 {
     return _pNameEdit->text();
+}
+
+int DeviceConfigTab::deviceId() const
+{
+    if (_pSchemaForm)
+    {
+        const int id = _pSchemaForm->values().value("id").toInt(-1);
+        if (id >= 0)
+        {
+            return id;
+        }
+    }
+    return _deviceId;
 }

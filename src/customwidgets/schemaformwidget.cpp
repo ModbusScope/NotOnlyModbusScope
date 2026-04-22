@@ -75,6 +75,7 @@ void SchemaFormWidget::setSchema(const QJsonObject& schema, const QJsonObject& v
 
         QString label = propSchema.value("title").toString(key);
         QWidget* widget = createWidgetForProperty(propSchema, currentValue);
+        wireFieldChanged(key, widget);
         _fields.append({ key, widget });
         _pFormLayout->addRow(label + ":", widget);
     }
@@ -90,6 +91,7 @@ void SchemaFormWidget::setSchema(const QJsonObject& schema, const QJsonObject& v
         QJsonObject propSchema = thenProps.value(key).toObject();
         QString label = propSchema.value("title").toString(key);
         QWidget* widget = createWidgetForProperty(propSchema, values.value(key));
+        wireFieldChanged(key, widget);
         _fields.append({ key, widget });
         _pFormLayout->addRow(label + ":", widget);
     }
@@ -100,6 +102,7 @@ void SchemaFormWidget::setSchema(const QJsonObject& schema, const QJsonObject& v
         QJsonObject propSchema = elseProps.value(key).toObject();
         QString label = propSchema.value("title").toString(key);
         QWidget* widget = createWidgetForProperty(propSchema, values.value(key));
+        wireFieldChanged(key, widget);
         _fields.append({ key, widget });
         _pFormLayout->addRow(label + ":", widget);
     }
@@ -174,6 +177,11 @@ QWidget* SchemaFormWidget::createWidgetForProperty(const QJsonObject& propSchema
             combo->setCurrentIndex(idx);
         }
 
+        if (propSchema.value("readOnly").toBool())
+        {
+            combo->setEnabled(false);
+        }
+
         return combo;
     }
     else if (type == "boolean")
@@ -191,6 +199,12 @@ QWidget* SchemaFormWidget::createWidgetForProperty(const QJsonObject& propSchema
         int maxVal = !maxJson.isUndefined() ? maxJson.toInt() : INT_MAX;
         spin->setRange(minVal, maxVal);
         spin->setValue(value.toInt(0));
+
+        if (propSchema.value("readOnly").toBool())
+        {
+            spin->setEnabled(false);
+        }
+
         return spin;
     }
     else if (type == "number")
@@ -202,14 +216,37 @@ QWidget* SchemaFormWidget::createWidgetForProperty(const QJsonObject& propSchema
         double maxVal = !maxJson.isUndefined() ? maxJson.toDouble() : std::numeric_limits<double>::max();
         spin->setRange(minVal, maxVal);
         spin->setValue(value.toDouble(0.0));
+
+        if (propSchema.value("readOnly").toBool())
+        {
+            spin->setEnabled(false);
+        }
+
         return spin;
     }
     else // "string" or unknown
     {
         auto* edit = new QLineEdit(this);
         edit->setText(value.toString());
+
+        if (propSchema.value("readOnly").toBool())
+        {
+            edit->setReadOnly(true);
+            edit->setEnabled(false);
+        }
+
         return edit;
     }
+}
+
+void SchemaFormWidget::wireFieldChanged(const QString& key, QWidget* widget)
+{
+    auto* edit = qobject_cast<QLineEdit*>(widget);
+    if (edit == nullptr)
+    {
+        return;
+    }
+    connect(edit, &QLineEdit::textChanged, this, [this, key](const QString& text) { emit fieldChanged(key, text); });
 }
 
 bool SchemaFormWidget::parseConditional(const QJsonObject& schema)
@@ -223,19 +260,24 @@ bool SchemaFormWidget::parseConditional(const QJsonObject& schema)
         return false;
     }
 
+    const QJsonObject ifProperties = ifObj.value("properties").toObject();
+
+    QString triggerKey;
     const QJsonArray required = ifObj.value("required").toArray();
-    if (required.size() != 1)
+    if (required.size() == 1)
     {
-        return false;
+        triggerKey = required.at(0).toString();
+    }
+    else if (ifProperties.size() == 1)
+    {
+        triggerKey = ifProperties.constBegin().key();
     }
 
-    const QString triggerKey = required.at(0).toString();
     if (triggerKey.isEmpty())
     {
         return false;
     }
 
-    const QJsonObject ifProperties = ifObj.value("properties").toObject();
     const QJsonObject constObj = ifProperties.value(triggerKey).toObject();
     if (!constObj.contains("const"))
     {
