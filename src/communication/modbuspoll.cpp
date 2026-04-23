@@ -48,7 +48,8 @@ void ModbusPoll::startCommunication(QList<DataPoint>& registerList)
     disconnect(_pAdapterManager, &AdapterManager::sessionStopped, this, &ModbusPoll::initAdapter);
     connect(_pAdapterManager, &AdapterManager::sessionStopped, this, &ModbusPoll::initAdapter);
 
-    qCInfo(scopeComm) << QString("Start logging: %1").arg(FormatDateTime::currentDateTime());
+    qCInfo(scopeComm) << "Active registers: " << DataPoint::dumpListToString(_registerList);
+    qCInfo(scopeComm) << qUtf8Printable(QString("Start logging: %1").arg(FormatDateTime::currentDateTime()));
 
     resetCommunicationStats();
 
@@ -67,7 +68,7 @@ void ModbusPoll::stopCommunication()
     _pPollTimer->stop();
     _pAdapterManager->stopSession();
 
-    qCInfo(scopeComm) << QString("Stop logging: %1").arg(FormatDateTime::currentDateTime());
+    qCInfo(scopeComm) << qUtf8Printable(QString("Stop logging: %1").arg(FormatDateTime::currentDateTime()));
 }
 
 bool ModbusPoll::isActive()
