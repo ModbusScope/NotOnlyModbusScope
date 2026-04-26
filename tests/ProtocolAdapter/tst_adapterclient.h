@@ -54,6 +54,10 @@ private slots:
     void expressionHelpInActiveState();
     void expressionHelpInWrongStateIgnored();
     void expressionHelpErrorIsNonFatal();
+
+    void readDataErrorIsNonFatal();
+    void readDataErrorInNonActiveStateIsIgnored();
+    void readDataErrorInIdleStateIsIgnored();
 };
 
 #endif // TST_ADAPTERCLIENT_H
